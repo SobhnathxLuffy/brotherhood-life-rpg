@@ -32,7 +32,19 @@ bun mini-services/game-socket/index.ts &   # live-sync service on :3003
 bun run dev              # http://localhost:3000
 ```
 
-First login PINs: **Sobhnath 1111 · Umang 2222** — change them in Settings immediately. Multi-device: open the same URL on both phones, each signs in as its own brother with its PIN.
+First login PINs: **Sobhnath 1111 · Umang 2222** — pick your name, the login screen shows your default PIN (tap it to fill), then change it in Settings ⚙ immediately. Multi-device: open the same URL on both phones, each signs in as its own brother with its PIN. The game's clock starts the first day the app is booted (`game_start_date`) — days before that never count, so a fresh install starts clean at 100 HP.
+
+## How to use it day to day (the loop)
+
+1. **Evening (22:30–23:30 IST or any time before 23:30)** — open **Quests**, write tomorrow's 3 quest texts (study / workout / skill) and hit the gold **LOCK QUESTS**. Tomorrow they're read-only — no moving goalposts.
+2. **Through the day** — log progress with the `+` buttons as you actually do it: study questions/hours, workout minutes (30+ unlocks 25 XP), skill blocks. Live XP preview on every card; the ledger strips show today's math.
+3. **Gaming / YouTube** — open **Vault** → **START WATCHING**; the stopwatch drains your bank live on both phones. Stop when done. Spend presets for quick guilt-free sessions. Never spend what you haven't earned.
+4. **Watch the boss** — when BOTH brothers are ≥70 XP on the same day, the boss takes **-140** automatically (HUD flashes + screen shake). Kill it by Sunday for +70 XP loot each.
+5. **Catch a cheat** — **Arena** → red **REPORT CHEAT**. They lose 30 (floor −30), you gain 30. Repeat offenders get lockdown; cheating during lockdown forfeits the PvP and heals the boss.
+6. **Bad day coming?** — before 18:00 IST, declare an **Override** (Arena) with a reason + the OTHER brother's PIN. Once per 14 days; skips HP loss and the punishment ticket that day. A 5-day 70+ XP streak earns a **shield** instead (burn it any day).
+7. **Midnight** — the server rolls over: <50 XP → −25 weekly HP; Sobhnath's remaining debt `R = 100 − max(0, netXp)` locks in as a punishment ticket with exact reps (×1 push / ×0.5 pull / ×1 crunch / ×2 squat, 5 kg / 2.5 kg).
+8. **Next morning** — Sobhnath does the reps; Umang watches and signs the ticket off with **his** PIN in the **Chamber**. No PIN, no forgiveness.
+9. **Sunday 22:00 IST** — PvP settles (KO beats XP-diff; both KO = draw). Loser pays the stake, winner marks **STAKE PAID**; Monday a fresh boss spawns.
 
 ## Deploy (free)
 
