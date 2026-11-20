@@ -1,0 +1,27 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { runDueJobs } from '@/lib/game'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * Scheduled jobs endpoint (IST): midnight rollover, Sunday 22:00 PvP settlement,
+ * Monday week spawn. Also runs opportunistically on every /api/state fetch.
+ * Point a free external cron (e.g. cron-job.org) here every 5 minutes.
+ * Protect with CRON_SECRET env → header "x-cron-secret".
+ */
+async function handle(req: NextRequest) {
+  const secret = process.env.CRON_SECRET
+  if (secret && req.headers.get('x-cron-secret') !== secret) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  try {
+    const jobs = await runDueJobs()
+    return NextResponse.json({ ok: true, jobs })
+  } catch (err) {
+    console.error('cron error', err)
+    return NextResponse.json({ error: 'Cron failed' }, { status: 500 })
+  }
+}
+
+export const GET = handle
+export const POST = handle

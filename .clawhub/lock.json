@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "@dietrichgebert/ponytail": {
+      "version": "5.3.3",
+      "installedAt": 1795196283324,
+      "ownerHandle": "dietrichgebert"
+    }
+  }
+}

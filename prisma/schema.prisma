@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../db/custom.db"
+}
+
+// For production (Vercel + Neon/Supabase Postgres): copy prisma/schema.postgres.prisma
+// over this file, set DATABASE_URL, then run `prisma db push`.
+
+model Player {
+  id                    String    @id // 'sobhnath' | 'umang'
+  displayName           String
+  pinHash               String // scrypt salt:hash
+  entMultiplier         Int // 1 for Sobhnath, 2 for Umang
+  hasPhysicalPunishment Boolean   @default(false)
+  shieldsCount          Int       @default(0)
+  current70Streak       Int       @default(0)
+  entBankMins           Float     @default(0)
+  lastOverrideAt        DateTime?
+}
+
+model Week {
+  id             Int      @id @default(autoincrement())
+  startDate      String   @unique // YYYY-MM-DD, always Monday (IST)
+  bossName       String
+  bossMaxHp      Int      @default(700)
+  bossCurrentHp  Int      @default(700)
+  bossDefeated   Boolean  @default(false)
+  sobhnathHp     Int      @default(100)
+  umangHp        Int      @default(100)
+  sobhnathKo     Boolean  @default(false)
+  umangKo        Boolean  @default(false)
+  pvpForfeitedBy String?
+  pvpWinner      String?
+  pvpStakeSettled Boolean @default(false)
+  logs           DailyLog[]
+}
+
+model DailyLog {
+  id               Int       @id @default(autoincrement())
+  week             Week      @relation(fields: [weekId], references: [id])
+  weekId           Int
+  playerId         String
+  logDate          String // YYYY-MM-DD (IST)
+  studyQuestText   String?
+  workoutQuestText String?
+  skillQuestText   String?
+  questsLockedAt   DateTime?
+  studyMode        String    @default("questions") // 'questions' | 'hours'
+  studyQuestions   Float     @default(0)
+  studyHours       Float     @default(0)
+  workoutMins      Int       @default(0)
+  skillMins        Int       @default(0)
+  xpMultiplier     Float     @default(1.0) // 0.5 on lockdown days
+  isLockdown       Boolean   @default(false)
+  shieldUsed       Boolean   @default(false)
+  overrideUsed     Boolean   @default(false)
+  overrideReason   String?
+  questXp          Float     @default(0) // raw quest xp (pre-multiplier)
+  netXp            Float     @default(0) // quest*mult + boss loot + snitch
+  bossHitApplied   Boolean   @default(false)
+
+  @@unique([playerId, logDate])
+  @@index([weekId])
+}
+
+model Ledger {
+  id            Int       @id @default(autoincrement())
+  playerId      String
+  weekId        Int?
+  logDate       String
+  deltaXp       Float
+  eventType     String // QUEST | SNITCH_GAIN | SNITCH_LOSS | BOSS_LOOT | JEE_IMPORT
+  note          String?
+  externalRefId String?   @unique // prevents double JEE import of same session id
+  createdAt     DateTime  @default(now())
+
+  @@index([logDate])
+  @@index([playerId, logDate])
+}
+
+model Punishment {
+  id           Int       @id @default(autoincrement())
+  logDate      String    @unique
+  remainingXp  Float
+  pushups      Float // 5kg
+  pullups      Float // 2.5kg
+  crunches     Float // 5kg
+  squats       Float // 5kg
+  status       String    @default("PENDING") // PENDING | COMPLETED
+  verifiedAt   DateTime?
+}
+
+model EntSession {
+  id        Int       @id @default(autoincrement())
+  playerId  String
+  startedAt DateTime
+  endedAt   DateTime?
+  minsSpent Float?
+}
+
+model AppMeta {
+  key   String @id
+  value String
+}
