@@ -59,3 +59,8 @@ agent-ctx/
 socket.log
 .zscripts/
 scripts/gen-icons.py
+scripts/
+tool-results/
+*.tsbuildinfo
+socket.log
+server.log

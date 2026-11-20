@@ -30,6 +30,7 @@ export interface PlayerState {
   shieldsCount: number
   streak: number
   entBankMins: number
+  entEarnedToday: number
   hasPhysicalPunishment: boolean
   lastOverrideAt: string | null
   todayLog: DailyLogView

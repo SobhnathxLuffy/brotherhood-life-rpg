@@ -5,18 +5,56 @@ import * as R from '@/engine/rules'
 import { daysBetween, istDateOffset, istDateStr, istMinutesOfDay, istParts, istToUtc, mondayOf, minutesUntilIST } from '@/lib/time'
 import type { GameState, PId, SocketEvent } from '@/lib/types'
 import type { DailyLog, Player, Week } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 // ============================ SEED & WEEK ============================
 
-export async function ensureSeed() {
+export async function ensureSeed(now: Date = new Date()) {
   const count = await db.player.count()
-  if (count > 0) return
-  await db.player.createMany({
-    data: [
-      { id: 'sobhnath', displayName: 'Sobhnath', pinHash: hashPin('1111'), entMultiplier: 1, hasPhysicalPunishment: true },
-      { id: 'umang', displayName: 'Umang', pinHash: hashPin('2222'), entMultiplier: 2, hasPhysicalPunishment: false },
-    ],
-  })
+  if (count === 0) {
+    await db.player.createMany({
+      data: [
+        { id: 'sobhnath', displayName: 'Sobhnath', pinHash: hashPin('1111'), entMultiplier: 1, hasPhysicalPunishment: true },
+        { id: 'umang', displayName: 'Umang', pinHash: hashPin('2222'), entMultiplier: 2, hasPhysicalPunishment: false },
+      ],
+    })
+    // The game begins the day the app is first booted — days BEFORE this marker
+    // are never rolled over, so a fresh install doesn't get KO'd for days the
+    // brothers never even had the app.
+    try {
+      await db.appMeta.create({ data: { key: 'game_start_date', value: istDateStr(now) } })
+    } catch {
+      // already exists — fine
+    }
+  }
+  await repairLogWeeks()
+}
+
+/**
+ * Repair legacy poisoned rows: DailyLogs whose weekId points at the wrong Week
+ * (created before getOrCreateLog derived the week from the log's own date —
+ * e.g. a Monday log attached to the previous week when created on a Sunday).
+ * Cheap at 2-player scale + idempotent — safe to run on every seed/state fetch.
+ */
+export async function repairLogWeeks(): Promise<number> {
+  const logs = await db.dailyLog.findMany({ select: { id: true, weekId: true, logDate: true } })
+  const weekIdByMonday = new Map<string, number>()
+  let fixed = 0
+  for (const log of logs) {
+    const monday = mondayOf(log.logDate)
+    let weekId = weekIdByMonday.get(monday)
+    if (weekId === undefined) {
+      const week = await db.week.findUnique({ where: { startDate: monday } })
+      if (!week) continue // week row doesn't exist yet — getOrCreateLog's mismatch repair handles it once it does
+      weekId = week.id
+      weekIdByMonday.set(monday, weekId)
+    }
+    if (log.weekId !== weekId) {
+      await db.dailyLog.update({ where: { id: log.id }, data: { weekId } })
+      fixed++
+    }
+  }
+  return fixed
 }
 
 export async function ensureWeek(now: Date = new Date()): Promise<Week> {
@@ -38,10 +76,18 @@ export async function weekOf(dateStr: string): Promise<Week | null> {
 // ============================ LOG HELPERS ============================
 
 export async function getOrCreateLog(playerId: string, dateStr: string, now: Date = new Date()): Promise<DailyLog> {
+  // Derive the week from the LOG's own date (noon IST so mondayOf matches that
+  // date) — never from `now`: callers pass tomorrow (quest lock, Tier-1 snitch
+  // lockdown) and on Sundays ensureWeek(now) would attach Monday's log to the
+  // OLD week, breaking boss damage, rollover HP and weekly sums forever.
+  // (`now` stays in the signature for caller compatibility only.)
+  const week = await ensureWeek(istToUtc(dateStr, 720))
   let log = await db.dailyLog.findUnique({ where: { playerId_logDate: { playerId, logDate: dateStr } } })
   if (!log) {
-    const week = await ensureWeek(now)
     log = await db.dailyLog.create({ data: { playerId, logDate: dateStr, weekId: week.id } })
+  } else if (log.weekId !== week.id) {
+    // repair rows created against the wrong week
+    log = await db.dailyLog.update({ where: { id: log.id }, data: { weekId: week.id } })
   }
   return log
 }
@@ -232,11 +278,17 @@ export async function reportSnitch(catcherId: PId, targetId: PId, violation: str
 // ============================ ENTERTAINMENT VAULT ============================
 
 export async function spendEnt(playerId: string, mins: number, now: Date = new Date()) {
-  if (mins <= 0) throw new GameError('Minutes must be positive.')
+  // NaN guard first: NaN <= 0 is false, so a bare `mins <= 0` lets NaN through
+  // and SQLite would store it as NULL — permanently zeroing the vault.
+  if (!Number.isFinite(mins) || mins <= 0) throw new GameError('Minutes must be a positive number.')
   const today = istDateStr(now)
   const log = await getOrCreateLog(playerId, today, now)
   if (log.isLockdown) throw new GameError('LOCKDOWN ACTIVE — entertainment spending is disabled today.')
   const player = await db.player.findUniqueOrThrow({ where: { id: playerId } })
+  // Manual spends are floored at the current balance — the vault may only go
+  // negative through the live watch drain, never through a manual spend.
+  mins = Math.min(mins, player.entBankMins)
+  if (mins <= 0) throw new GameError('Not enough minutes in the vault.')
   const updated = await db.player.update({ where: { id: playerId }, data: { entBankMins: { decrement: mins } } })
   await emit({ kind: 'ENT', playerId, amount: -mins, message: `${player.displayName} spent ${mins}m of entertainment time (${Math.floor(updated.entBankMins)}m left)` })
   return updated
@@ -254,7 +306,8 @@ export async function startWatch(playerId: string, now: Date = new Date()) {
 export async function stopWatch(playerId: string, now: Date = new Date()) {
   const open = await db.entSession.findFirst({ where: { playerId, endedAt: null } })
   if (!open) throw new GameError('No watch session running.')
-  const mins = R.round2((now.getTime() - open.startedAt.getTime()) / 60000)
+  const rawMins = (now.getTime() - open.startedAt.getTime()) / 60000
+  const mins = Number.isFinite(rawMins) ? R.round2(rawMins) : 0 // NaN-safety: never poison the vault
   await db.entSession.update({ where: { id: open.id }, data: { endedAt: now, minsSpent: mins } })
   const player = await db.player.update({ where: { id: playerId }, data: { entBankMins: { decrement: mins } } })
   await emit({ kind: 'ENT', playerId, amount: -mins, message: `${player.displayName} stopped watching — ${mins}m drained (balance ${Math.floor(player.entBankMins)}m)` })
@@ -315,20 +368,26 @@ class GameError extends Error {}
 
 export { GameError }
 
-async function getMeta(key: string) {
-  const row = await db.appMeta.findUnique({ where: { key } })
-  return row?.value || null
-}
-async function setMeta(key: string, value: string) {
-  await db.appMeta.upsert({ where: { key }, create: { key, value }, update: { value } })
-}
-
 /** Midnight rollover for `dateStr` (should be yesterday): HP penalty, streak/shields, punishment ticket. */
 export async function rollover(dateStr: string, now: Date = new Date()) {
   const metaKey = `rollover:${dateStr}`
-  if (await getMeta(metaKey)) return false
-  const week = await weekOf(dateStr)
-  if (week) {
+  // Claim-then-work: the create is an atomic claim (AppMeta.key is the PK).
+  // A concurrent trigger (cron route + state polls) hits the unique conflict and
+  // bails immediately instead of double-applying -25 HP / streak increments.
+  try {
+    await db.appMeta.create({ data: { key: metaKey, value: 'running' } })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return false // already claimed / done
+    throw err
+  }
+  try {
+    const week = await weekOf(dateStr)
+    if (!week) {
+      // No week row for this date → nothing to roll over. Mark done so we never
+      // re-claim it, and report false so callers treat it as a cheap no-op.
+      await db.appMeta.update({ where: { key: metaKey }, data: { value: 'done' } })
+      return false
+    }
     for (const pid of R.PLAYER_IDS) {
       const log = await db.dailyLog.findUnique({ where: { playerId_logDate: { playerId: pid, logDate: dateStr } } })
       const player = await db.player.findUniqueOrThrow({ where: { id: pid } })
@@ -341,10 +400,13 @@ export async function rollover(dateStr: string, now: Date = new Date()) {
           const isS = pid === 'sobhnath'
           const newHp = Math.max(0, (isS ? week.sobhnathHp : week.umangHp) - R.WEEKLY.LOW_XP_PENALTY)
           const ko = newHp <= 0
-          await db.week.update({
-            where: { id: week.id },
-            data: isS ? { sobhnathHp: newHp, sobhnathKo: ko, pvpForfeitedBy: ko ? pid : week.pvpForfeitedBy } : { umangHp: newHp, umangKo: ko, pvpForfeitedBy: ko ? pid : week.pvpForfeitedBy },
-          })
+          // Only the player who actually KO'd writes pvpForfeitedBy — never write
+          // it from the stale `week` snapshot, or a KO by the other player earlier
+          // in this same loop would be silently overwritten back to null.
+          const update = isS
+            ? { sobhnathHp: newHp, sobhnathKo: ko, ...(ko ? { pvpForfeitedBy: pid } : {}) }
+            : { umangHp: newHp, umangKo: ko, ...(ko ? { pvpForfeitedBy: pid } : {}) }
+          await db.week.update({ where: { id: week.id }, data: update })
           if (ko) await emit({ kind: 'PVP', playerId: pid, message: `${player.displayName} HIT 0 HP — KNOCKED OUT! Weekly PvP forfeited.` })
           else await emit({ kind: 'HP', playerId: pid, message: `${player.displayName} scored ${net} XP (<50) — -${R.WEEKLY.LOW_XP_PENALTY} weekly HP (${newHp} left)` })
         }
@@ -373,12 +435,21 @@ export async function rollover(dateStr: string, now: Date = new Date()) {
     const openSessions = await db.entSession.findMany({ where: { endedAt: null, startedAt: { lt: istToUtc(dateStr, 1440) } } })
     for (const s of openSessions) {
       const mins = R.round2((istToUtc(dateStr, 1439).getTime() - s.startedAt.getTime()) / 60000)
-      await db.entSession.update({ where: { id: s.id }, data: { endedAt: istToUtc(dateStr, 1439), minsSpent: Math.max(0, mins) } })
-      await db.player.update({ where: { id: s.playerId }, data: { entBankMins: { decrement: Math.max(0, mins) } } })
+      const drain = Number.isFinite(mins) ? Math.max(0, mins) : 0 // NaN-safety: Math.max(0, NaN) is still NaN
+      await db.entSession.update({ where: { id: s.id }, data: { endedAt: istToUtc(dateStr, 1439), minsSpent: drain } })
+      await db.player.update({ where: { id: s.playerId }, data: { entBankMins: { decrement: drain } } })
     }
+    await db.appMeta.update({ where: { key: metaKey }, data: { value: 'done' } })
+    return true
+  } catch (err) {
+    // release the claim so a later trigger can retry the whole day
+    try {
+      await db.appMeta.delete({ where: { key: metaKey } })
+    } catch {
+      // claim row already gone
+    }
+    throw err
   }
-  await setMeta(metaKey, 'done')
-  return true
 }
 
 /** Sunday 22:00 IST (or later) — settle weekly PvP for every finished week. */
@@ -389,10 +460,8 @@ export async function settleFinishedWeeks(now: Date = new Date()) {
   const unfinished = await db.week.findMany({ where: { pvpWinner: null } })
   let settled = 0
   for (const week of unfinished) {
-    const endDate = istDateOffset(daysBetween(week.startDate, today) >= 0 ? 0 : 0) // placeholder, real end below
     const endOffset = daysBetween(week.startDate, today)
     const weekEnded = endOffset > 6 || (endOffset === 6 && dow === 'Sun' && minutes >= 22 * 60)
-    void endDate
     if (!weekEnded) continue
     let winner: string
     if (week.sobhnathKo && week.umangKo) winner = 'draw'
@@ -414,8 +483,17 @@ export async function settleFinishedWeeks(now: Date = new Date()) {
 /** Opportunistic scheduler — runs due jobs idempotently. Safe to call on every state fetch. */
 export async function runDueJobs(now: Date = new Date()) {
   const jobs: string[] = []
-  const yesterday = istDateOffset(-1, now)
-  if (await rollover(yesterday, now)) jobs.push('rollover')
+  // Sweep backwards up to 10 days so multi-day downtime doesn't skip rollovers
+  // forever. Oldest-first (chronological) so streak increments/resets land in
+  // the right order, and no early break: the per-date claim inside rollover()
+  // makes already-done / missing-week days a fast no-op (returns false).
+  const gameStart = (await db.appMeta.findUnique({ where: { key: 'game_start_date' } }))?.value || null
+  for (let i = 10; i >= 1; i--) {
+    const date = istDateOffset(-i, now)
+    if (gameStart && date < gameStart) continue // before first boot — not a played day
+    const ok = await rollover(date, now)
+    if (ok) jobs.push(`rollover:${date}`)
+  }
   const settled = await settleFinishedWeeks(now)
   if (settled) jobs.push(`settlement x${settled}`)
   await ensureWeek(now)
@@ -432,6 +510,20 @@ export async function getFullState(now: Date = new Date()): Promise<GameState> {
   const today = istDateStr(now)
   const players = await db.player.findMany()
   const logsToday = await db.dailyLog.findMany({ where: { logDate: today } })
+  // Rebuild exactly what the vault credited today, event by event:
+  // QUEST rows are stored raw and were credited (delta × log.xpMultiplier
+  // [lockdown-aware]) × player.entMultiplier; SNITCH_GAIN / BOSS_LOOT rows
+  // were credited × player.entMultiplier. Negative rows never credit the vault.
+  const earnedTodayRows = await db.ledger.findMany({ where: { logDate: today, deltaXp: { gt: 0 } } })
+  const earnedTodayMap = new Map<string, number>()
+  for (const row of earnedTodayRows) {
+    const pid = row.playerId as PId
+    const playerMult = players.find((p) => p.id === pid)?.entMultiplier ?? 1
+    const mult = row.eventType === 'QUEST'
+      ? (logsToday.find((l) => l.playerId === pid)?.xpMultiplier ?? 1) * playerMult
+      : playerMult
+    earnedTodayMap.set(pid, R.round2((earnedTodayMap.get(pid) || 0) + row.deltaXp * mult))
+  }
   const weeklySums = await db.dailyLog.groupBy({ by: ['playerId'], _sum: { netXp: true }, where: { weekId: week.id } })
   const totalSums = await db.dailyLog.groupBy({ by: ['playerId'], _sum: { netXp: true }, where: { playerId: { in: R.PLAYER_IDS } } })
   const openSessions = await db.entSession.findMany({ where: { endedAt: null } })
@@ -455,6 +547,7 @@ export async function getFullState(now: Date = new Date()): Promise<GameState> {
           shieldsCount: player.shieldsCount,
           streak: player.current70Streak,
           entBankMins: player.entBankMins,
+          entEarnedToday: earnedTodayMap.get(pid) ?? 0,
           hasPhysicalPunishment: player.hasPhysicalPunishment,
           lastOverrideAt: player.lastOverrideAt?.toISOString() || null,
           todayLog: log
@@ -491,7 +584,9 @@ export async function getFullState(now: Date = new Date()): Promise<GameState> {
     deadlines: {
       questLockMins: minutesUntilIST(R.QUEST_LOCK.CUTOFF_HOUR, R.QUEST_LOCK.CUTOFF_MINUTE, now),
       overrideCutoffMins: minutesUntilIST(R.OVERRIDE.CUTOFF_HOUR, R.OVERRIDE.CUTOFF_MINUTE, now),
-      pvpEndMins: minutesUntilIST(22, 0, now),
+      // after the Sunday 22:00 settlement the week is over — don't let the
+      // countdown wrap around to next Monday's 22:00
+      pvpEndMins: p.dow === 'Sun' && p.minutes >= 22 * 60 ? 0 : minutesUntilIST(22, 0, now),
       newWeekMins: minutesUntilIST(24, 0, now),
       questLockPassed: istMinutesOfDay(now) >= R.QUEST_LOCK.CUTOFF_HOUR * 60 + R.QUEST_LOCK.CUTOFF_MINUTE,
       overrideCutoffPassed: istMinutesOfDay(now) >= R.OVERRIDE.CUTOFF_HOUR * 60,

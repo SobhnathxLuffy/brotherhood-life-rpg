@@ -43,8 +43,20 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < sessions.length; i++) {
       const s = sessions[i]
-      const questions = Number(s.questions ?? s.total_questions ?? 0)
-      const timeSeconds = Number(s.time_seconds ?? s.total_time_seconds ?? 0)
+      // Sessions may carry either question counts or time_seconds — a missing
+      // field counts as 0, but garbage (non-numeric strings etc.) must never
+      // reach the DB: Number() NaN would be stored as NULL in SQLite and poison
+      // questXp, and negatives would silently claw XP.
+      const rawQ = s.questions ?? s.total_questions
+      const rawT = s.time_seconds ?? s.total_time_seconds
+      const q = rawQ == null ? 0 : Number(rawQ)
+      const t = rawT == null ? 0 : Number(rawT)
+      if (!Number.isFinite(q) || q < 0 || !Number.isFinite(t) || t < 0 || (q === 0 && t === 0)) {
+        skipped++
+        continue
+      }
+      const questions = q
+      const timeSeconds = t
       const refId = `jee:${s.id ?? `${today}:${i}`}`
       const exists = await db.ledger.findUnique({ where: { externalRefId: refId } })
       if (exists) {
@@ -55,9 +67,12 @@ export async function POST(req: NextRequest) {
       await db.ledger.create({
         data: {
           playerId: me, logDate: today, weekId: log.weekId,
-          deltaXp: R.round2(questions * R.STUDY.QUEST_RATE),
+          // Provenance row only — deltaXp stays 0. Imported questions flow into
+          // the cumulative QUEST ledger row (capped/half-rate via calcQuestXP),
+          // so any XP number here would double-count in ledger sums.
+          deltaXp: 0,
           eventType: 'JEE_IMPORT', externalRefId: refId,
-          note: `JEE import: ${questions} questions${timeSeconds ? ` / ${(timeSeconds / 3600).toFixed(2)}h` : ''}`,
+          note: `JEE import: ${questions} questions${timeSeconds ? ` / ${(timeSeconds / 3600).toFixed(2)}h` : ''} (credited via quest XP)`,
         },
       })
       newQuestions += questions
@@ -71,7 +86,10 @@ export async function POST(req: NextRequest) {
         studyHours: R.round2(newHours),
       })
       const player = await db.player.findUniqueOrThrow({ where: { id: me } })
-      await emit({ kind: 'XP', playerId: me, message: `${player.displayName} imported ${imported} JEE session${imported > 1 ? 's' : ''} (${newQuestions} questions, +${R.round2(newQuestions * R.STUDY.QUEST_RATE)} XP)` })
+      // JEE_IMPORT rows are excluded from recomputeDaily's netXp — the XP is
+      // credited via today's capped quest totals, so the feed note stays
+      // informational instead of showing a misleading uncapped XP number.
+      await emit({ kind: 'XP', playerId: me, message: `${player.displayName} imported ${imported} JEE session${imported > 1 ? 's' : ''} — ${newQuestions} questions / ${R.round2(newHours)}h added to today's quest log.` })
     }
     return NextResponse.json({ ok: true, imported, skipped, newQuestions, newHours: R.round2(newHours) })
   } catch (err) {

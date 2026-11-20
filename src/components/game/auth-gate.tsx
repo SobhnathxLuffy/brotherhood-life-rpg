@@ -66,11 +66,25 @@ export function AuthGate() {
           aria-label="PIN"
         />
       </div>
+      {selected && (
+        <div className="mt-3 rounded border border-amber-400/50 bg-amber-400/10 px-3 py-2 text-center text-xs text-amber-200">
+          Default PIN for {selected === 'sobhnath' ? 'Sobhnath' : 'Umang'} is{' '}
+          <button
+            type="button"
+            onClick={() => setPin(selected === 'sobhnath' ? '1111' : '2222')}
+            className="num font-bold underline decoration-dotted hover:text-amber-100"
+            aria-label={`Fill default PIN for ${selected}`}
+          >
+            {selected === 'sobhnath' ? '1111' : '2222'}
+          </button>{' '}
+          — tap the number to fill, then change it in Settings.
+        </div>
+      )}
       <ActionButton className="mt-4 w-full" size="lg" tone={selected === 'umang' ? 'emerald' : 'cyan'} disabled={pin.length !== 4 || busy || !selected} onClick={submit}>
         <ShieldCheck className="mr-1 inline h-4 w-4" /> Enter Command
       </ActionButton>
-      <p className="mt-3 text-center text-[10px] text-muted-foreground">
-        First time? Default PINs are <span className="num text-cyan-300">1111</span> (Sobhnath) and <span className="num text-emerald-300">2222</span> (Umang) — change them in Settings.
+      <p className="mt-3 text-center text-[10px] leading-relaxed text-muted-foreground">
+        First time? Pick your name, use the default PIN shown above, and you're in. The HUD, Quests, Vault, Arena and Chamber tabs unlock after login — change your PIN in Settings ⚙.
       </p>
     </HudPanel>
   )

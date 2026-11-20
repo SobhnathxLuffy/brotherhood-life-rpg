@@ -1,7 +1,15 @@
+import { timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { runDueJobs } from '@/lib/game'
 
 export const dynamic = 'force-dynamic'
+
+/** Length-guarded, timing-safe string comparison. */
+function safeSecretEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a)
+  const bb = Buffer.from(b)
+  return ab.length === bb.length && timingSafeEqual(ab, bb)
+}
 
 /**
  * Scheduled jobs endpoint (IST): midnight rollover, Sunday 22:00 PvP settlement,
@@ -11,7 +19,8 @@ export const dynamic = 'force-dynamic'
  */
 async function handle(req: NextRequest) {
   const secret = process.env.CRON_SECRET
-  if (secret && req.headers.get('x-cron-secret') !== secret) {
+  // timing-safe compare; empty/unset CRON_SECRET keeps dev mode open
+  if (secret && !safeSecretEqual(req.headers.get('x-cron-secret') || '', secret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {

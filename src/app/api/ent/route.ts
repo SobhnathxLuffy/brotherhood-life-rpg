@@ -8,8 +8,14 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   const me = await currentPlayerId()
   if (!me) return NextResponse.json({ error: 'Sign in first' }, { status: 401 })
+  let body: { action?: string; mins?: unknown }
   try {
-    const { action, mins } = await req.json()
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  try {
+    const { action, mins } = body
     if (action === 'spend') {
       const player = await spendEnt(me, Number(mins))
       return NextResponse.json({ ok: true, balance: player.entBankMins })

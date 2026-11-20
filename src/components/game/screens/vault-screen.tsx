@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Eye, Info, Lock, Timer } from 'lucide-react'
 import type { GameState, PId } from '@/lib/types'
-import { entMinutesEarned, fmtClock, round2 } from '@/engine/rules'
+import { fmtClock, round2 } from '@/engine/rules'
 import { apiPost } from '@/components/game/live'
 import { ActionButton, GameBar, HudPanel, SectionTitle, StatChip } from '@/components/game/ui'
 import { Input } from '@/components/ui/input'
@@ -48,7 +48,9 @@ export function VaultScreen({ state }: { state: GameState }) {
   const drainedMins = round2(elapsedSec / 60)
   const liveBalance = watching ? round2(balance - drainedMins) : balance
   const negative = liveBalance < 0
-  const earnedToday = entMinutesEarned(Math.max(0, me?.todayLog.netXp ?? 0), me?.entMultiplier ?? 1)
+  // Server rebuilds exactly what the vault credited today (positive ledger
+  // events × the right multiplier) — always matches the real bank math.
+  const earnedToday = me?.entEarnedToday ?? 0
 
   const customMins = Number(custom)
   const customValid = Number.isFinite(customMins) && Number.isInteger(customMins) && customMins > 0
