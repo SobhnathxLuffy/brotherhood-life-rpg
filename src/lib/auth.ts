@@ -87,7 +87,18 @@ export function readSessionToken(token: string | undefined): string | null {
   return playerId
 }
 
-export async function currentPlayerId(): Promise<string | null> {
+/**
+ * Resolve the signed-in player. Checks the `x-session-token` header FIRST
+ * (needed when cookies are blocked — e.g. the app embedded in a cross-origin
+ * preview iframe), then falls back to the signed session cookie.
+ * Both carry the exact same signed token, so trust is identical.
+ */
+export async function currentPlayerId(req?: Request): Promise<string | null> {
+  const headerToken = req?.headers.get('x-session-token')
+  if (headerToken) {
+    const fromHeader = readSessionToken(headerToken)
+    if (fromHeader) return fromHeader
+  }
   const store = await cookies()
   return readSessionToken(store.get(SESSION_COOKIE)?.value)
 }

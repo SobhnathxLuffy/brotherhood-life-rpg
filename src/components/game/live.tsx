@@ -5,11 +5,43 @@ import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from '@tan
 import { io, type Socket } from 'socket.io-client'
 import type { GameState, SocketEvent } from '@/lib/types'
 
-export async function apiPost<T = Record<string, unknown>>(path: string, body?: unknown): Promise<T> {
+// ---- Bearer-token session (survives cookie-blocked contexts) ----
+// The preview iframe is cross-origin, so browsers refuse to send the session
+// cookie there. The auth endpoint therefore also returns a signed token which
+// we keep in localStorage and attach as `x-session-token` on every request.
+// Same signed token as the cookie — identical trust, works everywhere.
+const SESSION_KEY = 'rpg_session_token'
+
+export function saveSession(token: string): void {
+  try {
+    localStorage.setItem(SESSION_KEY, token)
+  } catch {
+    // storage blocked — cookie mode still works in first-party contexts
+  }
+}
+
+export function clearSession(): void {
+  try {
+    localStorage.removeItem(SESSION_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+export function sessionHeaders(): Record<string, string> {
+  try {
+    const t = localStorage.getItem(SESSION_KEY)
+    return t ? { 'x-session-token': t } : {}
+  } catch {
+    return {}
+  }
+}
+
+export async function apiPost<T = Record<string, unknown>>(path: string, body?: unknown, method: 'POST' | 'PUT' | 'DELETE' = 'POST'): Promise<T> {
   const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
+    method,
+    headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
+    body: method === 'DELETE' ? undefined : JSON.stringify(body ?? {}),
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error((data as { error?: string }).error || `Request failed (${res.status})`)
@@ -20,7 +52,7 @@ export function useGameState() {
   const query = useQuery<GameState>({
     queryKey: ['game-state'],
     queryFn: async () => {
-      const res = await fetch('/api/state', { cache: 'no-store' })
+      const res = await fetch('/api/state', { cache: 'no-store', headers: sessionHeaders() })
       if (!res.ok) throw new Error('Failed to load state')
       return res.json()
     },

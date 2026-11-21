@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { ShieldCheck, UserRound } from 'lucide-react'
-import { apiPost } from '@/components/game/live'
+import { apiPost, saveSession } from '@/components/game/live'
 import { HudPanel, ActionButton, SectionTitle } from '@/components/game/ui'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
@@ -25,7 +25,10 @@ export function AuthGate() {
     if (!selected || pin.length !== 4) return
     setBusy(true)
     try {
-      await apiPost('/api/auth', { playerId: selected, pin })
+      const res = await apiPost<{ ok: boolean; playerId: string; token: string }>('/api/auth', { playerId: selected, pin })
+      // Persist the bearer token — the preview iframe blocks cookies, so this
+      // token is what keeps the session alive in that context.
+      saveSession(res.token)
       toast.success(`Welcome back, ${selected === 'sobhnath' ? 'Sobhnath' : 'Umang'}!`)
       await qc.invalidateQueries({ queryKey: ['game-state'] })
     } catch (err) {

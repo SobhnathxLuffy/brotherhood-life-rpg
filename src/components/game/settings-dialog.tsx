@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { ActionButton, HudPanel, SectionTitle } from '@/components/game/ui'
 
 import { useQueryClient } from '@tanstack/react-query'
+import { apiPost, clearSession } from '@/components/game/live'
 import type { GameState } from '@/lib/types'
 
 export function SettingsDialog({ open, onOpenChange, state }: { open: boolean; onOpenChange: (v: boolean) => void; state: GameState }) {
@@ -17,10 +18,7 @@ export function SettingsDialog({ open, onOpenChange, state }: { open: boolean; o
   async function changePin() {
     setBusy(true)
     try {
-      // PUT for change-pin
-      const res = await fetch('/api/auth', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPin, newPin }) })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed')
+      await apiPost('/api/auth', { currentPin, newPin }, 'PUT')
       toast.success('PIN changed — keep it secret, keep it safe.')
       setCurrentPin('')
       setNewPin('')
@@ -32,7 +30,12 @@ export function SettingsDialog({ open, onOpenChange, state }: { open: boolean; o
   }
 
   async function signOut() {
-    await fetch('/api/auth', { method: 'DELETE' })
+    try {
+      await apiPost('/api/auth', undefined, 'DELETE')
+    } catch {
+      // server-side cookie already gone — still clear the local token below
+    }
+    clearSession()
     onOpenChange(false)
     await qc.invalidateQueries({ queryKey: ['game-state'] })
     toast('Signed out of this terminal.')

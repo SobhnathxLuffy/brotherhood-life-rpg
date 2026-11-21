@@ -38,6 +38,8 @@ export interface PlayerState {
   totalXp: number
   level: { level: number; title: string; progress: number }
   watching: boolean
+  /** ISO timestamp of the open watch session — lets the vault stopwatch survive reloads. */
+  watchingSince: string | null
 }
 
 export interface FeedEntry {

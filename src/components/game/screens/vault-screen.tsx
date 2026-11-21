@@ -22,7 +22,7 @@ function fmtElapsed(totalSec: number): string {
 
 export function VaultScreen({ state }: { state: GameState }) {
   const qc = useQueryClient()
-  const [elapsedSec, setElapsedSec] = useState(0)
+  const [, setTick] = useState(0)
   const [custom, setCustom] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -34,14 +34,13 @@ export function VaultScreen({ state }: { state: GameState }) {
   const lockdown = me?.todayLog.isLockdown ?? false
   const balance = me?.entBankMins ?? 0
 
-  // Live drain stopwatch — ticks from the first render where we see watching=true
+  // Live drain stopwatch — anchored to the SERVER's session start timestamp so
+  // it stays accurate across reloads (before, it reset to 0:00 on refresh).
+  const watchStartMs = me?.watchingSince ? new Date(me.watchingSince).getTime() : null
+  const elapsedSec = watching && watchStartMs ? Math.max(0, Math.floor((Date.now() - watchStartMs) / 1000)) : 0
   useEffect(() => {
-    if (!watching) {
-      setElapsedSec(0)
-      return
-    }
-    const started = Date.now()
-    const t = setInterval(() => setElapsedSec(Math.floor((Date.now() - started) / 1000)), 1000)
+    if (!watching) return
+    const t = setInterval(() => setTick((x) => x + 1), 1000)
     return () => clearInterval(t)
   }, [watching])
 

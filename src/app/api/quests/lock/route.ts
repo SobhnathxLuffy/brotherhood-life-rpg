@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 /** Lock tomorrow's 3 quests — allowed any time today BEFORE 23:30 IST. */
 export async function POST(req: NextRequest) {
-  const me = await currentPlayerId()
+  const me = await currentPlayerId(req)
   if (!me) return NextResponse.json({ error: 'Sign in first' }, { status: 401 })
   try {
     const now = new Date()

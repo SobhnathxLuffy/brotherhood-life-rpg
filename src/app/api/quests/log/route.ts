@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 
 /** Log quest progress deltas for today (questions / hours / workout mins / skill mins / mode toggle). */
 export async function POST(req: NextRequest) {
-  const me = await currentPlayerId()
+  const me = await currentPlayerId(req)
   if (!me) return NextResponse.json({ error: 'Sign in first' }, { status: 401 })
   let body: Record<string, unknown>
   try {

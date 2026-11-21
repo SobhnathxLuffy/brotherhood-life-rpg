@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 /** Entertainment vault: spend preset minutes OR start/stop the live drain stopwatch. */
 export async function POST(req: NextRequest) {
-  const me = await currentPlayerId()
+  const me = await currentPlayerId(req)
   if (!me) return NextResponse.json({ error: 'Sign in first' }, { status: 401 })
   let body: { action?: string; mins?: unknown }
   try {

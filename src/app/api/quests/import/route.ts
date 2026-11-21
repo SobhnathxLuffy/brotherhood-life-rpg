@@ -22,8 +22,10 @@ interface JeeSession {
  * and either question counts or total_time_seconds.
  */
 export async function POST(req: NextRequest) {
-  const me = await currentPlayerId()
+  const me = await currentPlayerId(req)
   if (!me) return NextResponse.json({ error: 'Sign in first' }, { status: 401 })
+  // JEE bridge is Sobhnath's — he runs the jee-study-app; Umang logs by hand.
+  if (me !== 'sobhnath') return NextResponse.json({ error: 'The JEE import bridge belongs to Sobhnath only.' }, { status: 403 })
   try {
     const payload = await req.json()
     const sessions: JeeSession[] = Array.isArray(payload)

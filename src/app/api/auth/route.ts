@@ -5,6 +5,7 @@ import {
   setSessionCookie,
   clearSessionCookie,
   currentPlayerId,
+  makeSessionToken,
   attemptKey,
   isRateLimited,
   recordFailedAttempt,
@@ -37,12 +38,15 @@ export async function POST(req: NextRequest) {
   }
   clearFailedAttempts(key)
   await setSessionCookie(playerId)
-  return NextResponse.json({ ok: true, playerId })
+  // Also hand back a signed bearer token: preview iframes (cross-origin) block
+  // cookies entirely, so the client stores this in localStorage and sends it
+  // as the `x-session-token` header on every request.
+  return NextResponse.json({ ok: true, playerId, token: makeSessionToken(playerId) })
 }
 
 // PUT — change own PIN
 export async function PUT(req: NextRequest) {
-  const me = await currentPlayerId()
+  const me = await currentPlayerId(req)
   if (!me) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
   let body: { currentPin?: unknown; newPin?: unknown }
   try {

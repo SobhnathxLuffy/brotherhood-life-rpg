@@ -502,7 +502,7 @@ export async function runDueJobs(now: Date = new Date()) {
 
 // ============================ FULL STATE ============================
 
-export async function getFullState(now: Date = new Date()): Promise<GameState> {
+export async function getFullState(now: Date = new Date(), req?: Request): Promise<GameState> {
   await ensureSeed()
   const jobs = await runDueJobs(now)
   void jobs
@@ -530,7 +530,7 @@ export async function getFullState(now: Date = new Date()): Promise<GameState> {
   const feed = await db.ledger.findMany({ orderBy: { createdAt: 'desc' }, take: 30 })
   const punishments = await db.punishment.findMany({ orderBy: { logDate: 'desc' }, take: 10 })
   const p = istParts(now)
-  const me = await currentPlayerId()
+  const me = await currentPlayerId(req)
 
   const playerStates = Object.fromEntries(
     players.map((player) => {
@@ -562,6 +562,7 @@ export async function getFullState(now: Date = new Date()): Promise<GameState> {
           totalXp: R.round2(totalXp),
           level: R.levelFromTotalXp(totalXp),
           watching: openSessions.some((s) => s.playerId === pid),
+          watchingSince: openSessions.find((s) => s.playerId === pid)?.startedAt.toISOString() ?? null,
         },
       ]
     }),

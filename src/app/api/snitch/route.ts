@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 /** Report a cheating violation — runs the escalation state machine server-side. */
 export async function POST(req: NextRequest) {
-  const me = await currentPlayerId()
+  const me = await currentPlayerId(req)
   if (!me) return NextResponse.json({ error: 'Sign in first' }, { status: 401 })
   try {
     const { target, violation, note } = await req.json()

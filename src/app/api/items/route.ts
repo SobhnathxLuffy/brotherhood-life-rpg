@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 /** Tactical items: burn a Rest Shield OR declare a Big-Event Override (needs brother's PIN). */
 export async function POST(req: NextRequest) {
-  const me = await currentPlayerId()
+  const me = await currentPlayerId(req)
   if (!me) return NextResponse.json({ error: 'Sign in first' }, { status: 401 })
   try {
     const { action, reason, cosignPin } = await req.json()
