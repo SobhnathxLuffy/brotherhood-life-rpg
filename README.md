@@ -32,7 +32,17 @@ bun mini-services/game-socket/index.ts &   # live-sync service on :3003
 bun run dev              # http://localhost:3000
 ```
 
-First login PINs: **Sobhnath 1111 · Umang 2222** — pick your name, the login screen shows your default PIN (tap it to fill), then change it in Settings ⚙ immediately. Multi-device: open the same URL on both phones, each signs in as its own brother with its PIN. The game's clock starts the first day the app is booted (`game_start_date`) — days before that never count, so a fresh install starts clean at 100 HP.
+First login PINs: **Sobhnath 1111 · Umang 2222** — pick your name, the login screen shows your default PIN (tap it to fill), then change it in Settings ⚙ immediately. Multi-device: open the same URL on both phones, each signs in as its own brother with its PIN. Login works everywhere — normal browsers (session cookie) AND embedded preview windows/iframes (bearer token, stored automatically after login) — so the tabs always unlock after entering your PIN. The game's clock starts the first day the app is booted (`game_start_date`) — days before that never count, so a fresh install starts clean at 100 HP.
+
+## The 5 screens — what each one is
+
+| Tab | What it is | What you do there |
+|---|---|---|
+| **HUD** | Command center — both brothers' cards (Weekly HP, today's XP, streak, shields, "WATCHING NOW" badge), the shared co-op **Boss arena** (pixel titan + HP bar + trigger lamps), all 4 deadline countdowns, and the live combat feed of every XP event | Watch the war. Boss lamps mean ≥70 XP; when both are lit, the boss takes −140 automatically |
+| **Quests** | The daily grind board — lock **tomorrow's** 3 quests at night, then log study / workout / skill progress through the day with `+` buttons and live XP previews (Sobhnath also gets the JEE JSON drag-drop import here) | Lock quests before 23:30 IST; tap `+` as you actually do things |
+| **Vault** | Your entertainment bank — every XP earned becomes guilt-free minutes (Sobhnath 1 XP = 1 min, Umang = 2 min). Shows balance, **live drain stopwatch**, quick-spend presets | Press START before gaming/YouTube, stop when done; the vault drains live and your brother sees it |
+| **Arena** | The weekly war room — PvP head-to-head tug-of-war bar, the stake (₹50 treat / 2-day chore) with Sunday countdown, Weekly HP + KO watch, the **Snitch Tribunal** (report cheats → 3-tier escalation), Rest Shield + Big-Event Override cards | Snitch on cheating, burn shields, declare overrides, mark the stake paid |
+| **Chamber** | Sobhnath's punishment hall — live debt forecast (`R = 100 − max(0, netXp)` → push/pull/crunch/squat reps), the midnight pending tickets queue, completed history. **Only Umang's PIN can sign off a ticket** | Umang watches the reps, enters his PIN, debt cleared |
 
 ## How to use it day to day (the loop)
 
@@ -61,7 +71,7 @@ The pure-Supabase path (schema + pg_cron in IST) lives in `supabase/`.
 src/engine/rules.ts          ← EVERY number in the game (immutable, pure functions)
 src/lib/game.ts              ← server service: XP recompute, snitch state machine, boss damage, cron jobs
 src/lib/time.ts              ← IST helpers (device clocks are irrelevant)
-src/lib/auth.ts              ← PIN (scrypt) + signed session cookie
+src/lib/auth.ts              ← PIN (scrypt) + signed session (cookie + bearer token for iframes)
 src/app/api/*                ← state, auth, quests/lock|log|import, ent, snitch, items, punishments, pvp, cron
 mini-services/game-socket/   ← socket.io broadcaster (port 3003)
 src/components/game/screens/ ← HUD · Quests · Vault · Arena · Chamber
