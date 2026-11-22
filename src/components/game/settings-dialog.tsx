@@ -48,7 +48,7 @@ export function SettingsDialog({ open, onOpenChange, state, onRequestSwitch }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="ember-ring border-border bg-card sm:max-w-sm">
+      <DialogContent className="ember-ring max-h-[85dvh] overflow-y-auto border-border bg-card sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="font-display text-sm uppercase tracking-[0.2em]">Settings — {me.displayName}</DialogTitle>
         </DialogHeader>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { useTheme } from 'next-themes'
-import { Command, Swords, Coins, Skull, Dumbbell, Settings, Shield, Sun, Moon, UserRoundCog } from 'lucide-react'
+import { Command, Swords, Coins, Skull, Dumbbell, History, Settings, Shield, Sun, Moon, UserRoundCog } from 'lucide-react'
 import { QueryClientProvider, apiPost, useGameProvider, useGameState, useLiveEvents } from '@/components/game/live'
 import { FxLayer, type FxEvent } from '@/components/game/fx'
 import { HudPanel, ActionButton } from '@/components/game/ui'
@@ -16,6 +16,7 @@ import { QuestsScreen } from '@/components/game/screens/quests-screen'
 import { VaultScreen } from '@/components/game/screens/vault-screen'
 import { ArenaScreen } from '@/components/game/screens/arena-screen'
 import { ChamberScreen } from '@/components/game/screens/chamber-screen'
+import { HistoryScreen } from '@/components/game/screens/history-screen'
 import type { GameState, SocketEvent } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -47,6 +48,7 @@ const TABS = [
   { id: 'vault', label: 'Vault', icon: Coins },
   { id: 'arena', label: 'Arena', icon: Skull },
   { id: 'chamber', label: 'Chamber', icon: Dumbbell },
+  { id: 'history', label: 'History', icon: History },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -195,6 +197,7 @@ function GameShell() {
               tab === 'quests' ? <QuestsScreen state={state} /> :
               tab === 'vault' ? <VaultScreen state={state} /> :
               tab === 'arena' ? <ArenaScreen state={state} /> :
+              tab === 'history' ? <HistoryScreen state={state} /> :
               <ChamberScreen state={state} />
             ) : (
               <AuthGate />
@@ -204,7 +207,7 @@ function GameShell() {
 
         {/* Bottom nav (mobile) */}
         <nav className="glass fixed inset-x-0 bottom-0 z-40 border-t border-border/60 md:hidden" aria-label="Screens" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-          <div className="grid grid-cols-5">
+          <div className="grid grid-cols-6">
             {TABS.map((t) => (
               <button
                 key={t.id}

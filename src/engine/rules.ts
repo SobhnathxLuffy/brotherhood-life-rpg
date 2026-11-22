@@ -61,8 +61,10 @@ export function entMinutesEarned(effectiveXp: number, entMultiplier: number): nu
 }
 
 // ---------- Sobhnath's physical punishment ----------
-// gamee.pdf OCR rendered pullups as "⅗" — resolved to 0.5 per plan decision.
-export const PUNISHMENT = { PUSHUP_MULT: 1, PULLUP_MULT: 0.5, CRUNCH_MULT: 1, SQUAT_MULT: 2 }
+// gamee.pdf specified pullups as "⅗" = 0.6 per XP short (restored 2026-11-22 —
+// the plan had wrongly flattened it to 0.5). Only Sobhnath owes physical reps
+// (hasPhysicalPunishment), so this multiplier affects him alone.
+export const PUNISHMENT = { PUSHUP_MULT: 1, PULLUP_MULT: 0.6, CRUNCH_MULT: 1, SQUAT_MULT: 2 }
 export function calcPunishmentReps(R: number) {
   return {
     pushups: round2(R * PUNISHMENT.PUSHUP_MULT),

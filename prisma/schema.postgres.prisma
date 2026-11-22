@@ -79,7 +79,7 @@ model Ledger {
   weekId        Int?
   logDate       String
   deltaXp       Float
-  eventType     String // QUEST | SNITCH_GAIN | SNITCH_LOSS | BOSS_LOOT | JEE_IMPORT
+  eventType     String // QUEST | QUEST_LOCK | QUEST_EDIT | QUEST_UNDO | SNITCH_GAIN | SNITCH_LOSS | BOSS_LOOT | JEE_IMPORT
   note          String?
   externalRefId String?   @unique // prevents double JEE import of same session id
   createdAt     DateTime  @default(now())

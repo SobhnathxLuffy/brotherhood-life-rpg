@@ -54,7 +54,7 @@ export function SwitchUserDialog({ open, onOpenChange, state }: { open: boolean;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="ember-ring border-border bg-card sm:max-w-sm">
+      <DialogContent className="ember-ring max-h-[85dvh] overflow-y-auto border-border bg-card sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-display text-sm uppercase tracking-[0.2em]">
             <ArrowLeftRight className="h-4 w-4 text-gold" /> Switch user

@@ -318,7 +318,7 @@ function SnitchTribunal({ state }: { state: GameState }) {
 
       {/* Tribunal dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="ember-ring border-crimson/40 bg-card sm:max-w-md">
+        <DialogContent className="ember-ring max-h-[85dvh] overflow-y-auto border-crimson/40 bg-card sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-display text-sm uppercase tracking-[0.2em] text-crimson">
               <Gavel className="h-4 w-4" aria-hidden /> Snitch Tribunal — Verdict

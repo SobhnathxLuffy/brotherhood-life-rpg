@@ -40,6 +40,8 @@ export interface PlayerState {
   hasPhysicalPunishment: boolean
   lastOverrideAt: string | null
   todayLog: DailyLogView
+  /** tomorrow's log (quest plan written during the nightly lock) — null until it exists */
+  tomorrowLog: DailyLogView | null
   weeklyXp: number
   totalXp: number
   level: { level: number; title: string; progress: number }

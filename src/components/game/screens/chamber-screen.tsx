@@ -50,7 +50,7 @@ function SpringNum({ value, className }: { value: number; className?: string }) 
 
 const REP_CARDS = [
   { key: 'pushups', name: 'PUSHUPS', weightKg: '5', mult: '×1', icon: Dumbbell },
-  { key: 'pullups', name: 'PULLUPS', weightKg: '2.5', mult: '×0.5', icon: ChevronsUp },
+  { key: 'pullups', name: 'PULLUPS', weightKg: '2.5', mult: '×0.6', icon: ChevronsUp },
   { key: 'crunches', name: 'CRUNCHES', weightKg: '5', mult: '×1', icon: Repeat },
   { key: 'squats', name: 'SQUATS', weightKg: '5', mult: '×2', icon: ArrowDownUp },
 ] as const

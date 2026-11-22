@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { AlertTriangle, BookOpen, Dumbbell, Eye, FileJson, Hammer, Lock, Undo2, UserRound } from 'lucide-react'
+import { AlertTriangle, BookOpen, CalendarDays, Dumbbell, Eye, FileJson, Hammer, Lock, Pencil, Undo2, UserRound } from 'lucide-react'
 import type { GameState, PId, PlayerState } from '@/lib/types'
 import {
   LATE_QUEST_MULT,
@@ -76,10 +76,6 @@ function lsSet(key: string, value: string): void {
   } catch {
     // private mode / storage disabled — prompt guard degrades gracefully
   }
-}
-
-function lockedTomorrowKey(date: string): string {
-  return `lockedTomorrow:${date}`
 }
 
 function lockPromptKey(date: string): string {
@@ -181,10 +177,7 @@ function QuestLockForm({ date, late, onLocked }: { date: string; late?: boolean;
     setBusy(true)
     try {
       await apiPost('/api/quests/lock', { study: study.trim(), workout: workout.trim(), skill: skill.trim(), ...(late ? { target: 'today' } : {}) })
-      if (!late) {
-        lsSet(lockedTomorrowKey(date), '1')
-        lsSet(lockPromptKey(date), '1')
-      }
+      if (!late) lsSet(lockPromptKey(date), '1')
       await qc.invalidateQueries({ queryKey: ['game-state'] })
       toast.success(late
         ? "Today's quests locked late — 0.8x XP toll active. Salvage mode engaged."
@@ -329,7 +322,7 @@ function BrotherQuestsPanel({ state }: { state: GameState }) {
 
 // ---------- B. quest card shell ----------
 
-function QuestCard({ glow, icon, title, baseXp, questText, questsLocked, lateQuests, logDate, children }: {
+function QuestCard({ glow, icon, title, baseXp, questText, questsLocked, lateQuests, logDate, onEdit, children }: {
   glow: 'cyan' | 'emerald' | 'gold'
   icon: ReactNode
   title: string
@@ -338,6 +331,7 @@ function QuestCard({ glow, icon, title, baseXp, questText, questsLocked, lateQue
   questsLocked: boolean
   lateQuests?: boolean
   logDate: string
+  onEdit?: () => void
   children: ReactNode
 }) {
   return (
@@ -356,6 +350,15 @@ function QuestCard({ glow, icon, title, baseXp, questText, questsLocked, lateQue
           <p className="mt-1 flex items-center gap-2 text-[9px] uppercase tracking-[0.25em] text-muted-foreground/70">
             Read-only — locked {logDate}
             {lateQuests && <span className="rounded-full border border-gold/40 bg-gold/10 px-1.5 py-0.5 text-gold normal-case tracking-normal">late · ×{LATE_QUEST_MULT} XP</span>}
+            {onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="ml-auto inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 font-bold normal-case tracking-normal text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+              >
+                <Pencil className="h-2.5 w-2.5" aria-hidden /> Edit quests
+              </button>
+            )}
           </p>
         </div>
       ) : (
@@ -478,7 +481,7 @@ function JeeBridge() {
 
 // ---------- study card (60 base XP) ----------
 
-function StudyCard({ me, post, busy }: { me: PlayerState; post: (body: QuestDeltaBody, okMsg: string) => Promise<void>; busy: boolean }) {
+function StudyCard({ me, post, busy, onEdit }: { me: PlayerState; post: (body: QuestDeltaBody, okMsg: string) => Promise<void>; busy: boolean; onEdit?: () => void }) {
   const log = me.todayLog
   const isQuestions = log.studyMode === 'questions'
   const value = isQuestions ? log.studyQuestions : log.studyHours
@@ -497,6 +500,7 @@ function StudyCard({ me, post, busy }: { me: PlayerState; post: (body: QuestDelt
       questsLocked={log.questsLocked}
       lateQuests={log.lateQuests}
       logDate={log.logDate}
+      onEdit={onEdit}
     >
       {/* mode toggle */}
       <div className="mb-3 flex gap-1.5" role="tablist" aria-label="Study tracking mode">
@@ -570,7 +574,7 @@ function StudyCard({ me, post, busy }: { me: PlayerState; post: (body: QuestDelt
 
 // ---------- workout card (25 base XP) ----------
 
-function WorkoutCard({ me, post, busy }: { me: PlayerState; post: (body: QuestDeltaBody, okMsg: string) => Promise<void>; busy: boolean }) {
+function WorkoutCard({ me, post, busy, onEdit }: { me: PlayerState; post: (body: QuestDeltaBody, okMsg: string) => Promise<void>; busy: boolean; onEdit?: () => void }) {
   const log = me.todayLog
   const mins = log.workoutMins
   const xp = calcWorkoutXP(mins)
@@ -586,6 +590,7 @@ function WorkoutCard({ me, post, busy }: { me: PlayerState; post: (body: QuestDe
       questsLocked={log.questsLocked}
       lateQuests={log.lateQuests}
       logDate={log.logDate}
+      onEdit={onEdit}
     >
       <div className="flex flex-wrap gap-1.5">
         <ActionButton
@@ -640,7 +645,7 @@ function WorkoutCard({ me, post, busy }: { me: PlayerState; post: (body: QuestDe
 
 // ---------- skill card (15 base XP) ----------
 
-function SkillCard({ me, post, busy }: { me: PlayerState; post: (body: QuestDeltaBody, okMsg: string) => Promise<void>; busy: boolean }) {
+function SkillCard({ me, post, busy, onEdit }: { me: PlayerState; post: (body: QuestDeltaBody, okMsg: string) => Promise<void>; busy: boolean; onEdit?: () => void }) {
   const log = me.todayLog
   const mins = log.skillMins
   const xp = calcSkillXP(mins)
@@ -656,6 +661,7 @@ function SkillCard({ me, post, busy }: { me: PlayerState; post: (body: QuestDelt
       questsLocked={log.questsLocked}
       lateQuests={log.lateQuests}
       logDate={log.logDate}
+      onEdit={onEdit}
     >
       <div className="flex flex-wrap gap-1.5">
         {[15, 30, 45].map((n) => (
@@ -700,18 +706,136 @@ function SkillCard({ me, post, busy }: { me: PlayerState; post: (body: QuestDelt
   )
 }
 
+// ---------- tomorrow's quests panel (server truth, editable) ----------
+
+/** IST-safe tomorrow date string (noon-IST anchor keeps the ISO slice on the right day). */
+function istTomorrow(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00+05:30`)
+  d.setUTCDate(d.getUTCDate() + 1)
+  return d.toISOString().slice(0, 10)
+}
+
+function TomorrowQuestsPanel({ state, onEdit }: { state: GameState; onEdit: () => void }) {
+  const meId = state.me
+  if (!meId) return null
+  const me = state.players[meId]
+  const tl = me?.tomorrowLog
+  const quests: Array<{ icon: ReactNode; label: string; text: string | null }> = [
+    { icon: <BookOpen className="h-3.5 w-3.5" />, label: 'Study', text: tl?.studyQuestText ?? null },
+    { icon: <Dumbbell className="h-3.5 w-3.5" />, label: 'Workout', text: tl?.workoutQuestText ?? null },
+    { icon: <Hammer className="h-3.5 w-3.5" />, label: 'Skill', text: tl?.skillQuestText ?? null },
+  ]
+
+  return (
+    <HudPanel glow={tl?.questsLocked ? 'gold' : undefined}>
+      <SectionTitle
+        right={
+          tl?.questsLocked ? (
+            <StatChip tone="emerald" label={tl.logDate} value="locked" />
+          ) : (
+            <StatChip label={istTomorrow(state.ist.date)} value="not written" />
+          )
+        }
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <CalendarDays className="h-4 w-4" aria-hidden />
+          Tomorrow&apos;s quests
+        </span>
+      </SectionTitle>
+      {tl?.questsLocked ? (
+        <div className="space-y-2">
+          {quests.map((q) => (
+            <div key={q.label} className="flex items-start gap-2 rounded-lg border border-border/70 bg-foreground/[0.03] px-3 py-2">
+              <span className="mt-0.5 text-muted-foreground" aria-hidden>{q.icon}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-muted-foreground/70">{q.label}</p>
+                <p className="text-xs italic leading-relaxed text-foreground/90">&ldquo;{q.text ?? '—'}&rdquo;</p>
+              </div>
+            </div>
+          ))}
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] text-muted-foreground/70">Committed for {tl.logDate} — edits stamp the History tab.</p>
+            <ActionButton tone="gold" size="sm" onClick={onEdit} className="shrink-0">
+              <Pencil className="mr-1 inline h-3 w-3" aria-hidden /> Edit
+            </ActionButton>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-foreground/[0.03] px-3 py-3 text-xs font-semibold text-muted-foreground">
+          <Lock className="h-4 w-4 shrink-0" aria-hidden />
+          Nothing written for tomorrow yet — lock them tonight before 11:30 PM IST (panel above).
+        </div>
+      )}
+    </HudPanel>
+  )
+}
+
+// ---------- quest editor (today & tomorrow — corrections / testing) ----------
+
+function EditQuestsDialog({ state, target, onClose }: { state: GameState; target: 'today' | 'tomorrow'; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  const me = state.me ? state.players[state.me] : null
+  const log = target === 'today' ? me?.todayLog : me?.tomorrowLog ?? null
+  const [study, setStudy] = useState(log?.studyQuestText ?? '')
+  const [workout, setWorkout] = useState(log?.workoutQuestText ?? '')
+  const [skill, setSkill] = useState(log?.skillQuestText ?? '')
+  const ready = study.trim().length > 0 && workout.trim().length > 0 && skill.trim().length > 0
+  const when = target === 'today' ? 'today' : 'tomorrow'
+
+  async function save() {
+    setBusy(true)
+    try {
+      await apiPost('/api/quests/edit', { study: study.trim(), workout: workout.trim(), skill: skill.trim(), target })
+      await qc.invalidateQueries({ queryKey: ['game-state'] })
+      toast.success(`${when === 'today' ? "Today's" : "Tomorrow's"} quests updated — the before→after is stamped in History.`)
+      onClose()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Quest edit failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose() }}>
+      <DialogContent className="ember-ring max-h-[85dvh] overflow-y-auto border-gold/30 bg-card sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 font-display text-sm uppercase tracking-[0.2em]">
+            <Pencil className="h-4 w-4 text-gold" aria-hidden />
+            Edit {when}&apos;s quests
+          </DialogTitle>
+          <DialogDescription>
+            Corrections &amp; testing — edit anytime, even after a lock. Every change is stamped into the History tab. XP rules stay untouched.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2.5">
+          <QuestField label="Study quest" value={study} onChange={setStudy} placeholder="e.g. 25 MCQs of Rotational Motion" />
+          <QuestField label="Workout quest" value={workout} onChange={setWorkout} placeholder="e.g. Push day — 4 sets incl. 30 pushups" />
+          <QuestField label="Skill quest" value={skill} onChange={setSkill} placeholder="e.g. 45m practice — new scale" />
+          <ActionButton tone="gold" size="lg" className="w-full" disabled={!ready || busy} onClick={() => { void save() }}>
+            <Pencil className="mr-1.5 inline h-4 w-4" aria-hidden /> Save quests
+          </ActionButton>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ---------- undo station ----------
 
 function UndoStation({ me, busy, onUndo }: { me: PlayerState; busy: boolean; onUndo: () => Promise<void> }) {
   const log = me.todayLog
   return (
     <HudPanel glow={log.canUndo ? 'crimson' : undefined} className={cn(!log.canUndo && 'opacity-70')}>
-      <SectionTitle right={log.undoLabel ? <StatChip tone="crimson" label="last action" value={log.undoLabel} /> : <StatChip label="last action" value="—" />}>
+      <SectionTitle right={log.undoLabel ? <StatChip tone="crimson" pulse label="last action" value={log.undoLabel} /> : <StatChip label="last action" value="—" />}>
         Undo station
       </SectionTitle>
       <div className="flex items-center justify-between gap-3">
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Misclicked a &ldquo;done&rdquo; or an XP bump? Reverse the latest action — XP, vault credit and the ledger all snap back.
+          {log.canUndo
+            ? 'Misclick insurance is armed — tap Undo to reverse the action above (XP, vault credit and ledger all snap back).'
+            : 'Misclicked a “done” or an XP bump? This button reverses the latest action — log something first, then it arms itself.'}
         </p>
         <ActionButton tone="crimson" disabled={!log.canUndo || busy} onClick={() => { void onUndo() }} className="shrink-0">
           <Undo2 className="mr-1.5 inline h-4 w-4" aria-hidden />
@@ -766,11 +890,14 @@ function SummaryStrip({ me }: { me: PlayerState }) {
 export function QuestsScreen({ state }: { state: GameState }) {
   const qc = useQueryClient()
   const [promptOpen, setPromptOpen] = useState(false)
-  const [lockedOk, setLockedOk] = useState(false)
+  const [editTarget, setEditTarget] = useState<'today' | 'tomorrow' | null>(null)
   const [busy, setBusy] = useState(false)
 
   const date = state.ist.date
   const promptKey = lockPromptKey(date)
+  const me = state.me ? state.players[state.me] : null
+  // server truth — tomorrow is locked iff the DB row says so (no localStorage guessing)
+  const tomorrowLocked = !!me?.tomorrowLog?.questsLocked
 
   // Nightly auto-prompt — fires once per IST day inside the 22:30–23:30 lock window
   useEffect(() => {
@@ -779,17 +906,10 @@ export function QuestsScreen({ state }: { state: GameState }) {
     const promptFrom = QUEST_LOCK.PROMPT_HOUR * 60 + QUEST_LOCK.PROMPT_MINUTE
     const cutoff = QUEST_LOCK.CUTOFF_HOUR * 60 + QUEST_LOCK.CUTOFF_MINUTE
     if (mins < promptFrom || mins > cutoff) return
-    if (lsGet(promptKey) || lsGet(lockedTomorrowKey(date))) return
+    if (lsGet(promptKey) || tomorrowLocked) return
     lsSet(promptKey, '1')
     setPromptOpen(true)
-  }, [state.ist.minutes, state.ist.date, state.deadlines.questLockPassed, promptKey, date])
-
-  // Restore the "locked for tomorrow" marker across reloads
-  useEffect(() => {
-    setLockedOk(lsGet(lockedTomorrowKey(date)) === '1')
-  }, [date])
-
-  const me = state.me ? state.players[state.me] : null
+  }, [state.ist.minutes, state.deadlines.questLockPassed, promptKey, tomorrowLocked])
 
   const post = useCallback(
     async (body: QuestDeltaBody, okMsg: string) => {
@@ -828,15 +948,16 @@ export function QuestsScreen({ state }: { state: GameState }) {
   )
 
   const onLocked = useCallback(() => {
-    lsSet(lockedTomorrowKey(date), '1')
     lsSet(promptKey, '1')
-    setLockedOk(true)
     setPromptOpen(false)
-  }, [date, promptKey])
+  }, [promptKey])
 
   const onLateLocked = useCallback(() => {
     setPromptOpen(false)
   }, [])
+
+  const openTodayEdit = useCallback(() => setEditTarget('today'), [])
+  const openTomorrowEdit = useCallback(() => setEditTarget('tomorrow'), [])
 
   if (!me) {
     return (
@@ -850,37 +971,44 @@ export function QuestsScreen({ state }: { state: GameState }) {
 
   return (
     <div className="space-y-4">
+      {/* Undo station FIRST — the misclick rescue must never sit below the fold */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, ease: 'easeOut' }}>
+        <UndoStation me={me} busy={busy} onUndo={undo} />
+      </motion.div>
+
       {needsLateRescue && (
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, ease: 'easeOut' }}>
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05, duration: 0.28, ease: 'easeOut' }}>
           <LateRescuePanel me={me} onLocked={onLateLocked} />
         </motion.div>
       )}
 
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05, duration: 0.28, ease: 'easeOut' }}>
-        <LockPanel state={state} lockedOk={lockedOk} onLocked={onLocked} />
-      </motion.div>
-
-      <motion.div className="space-y-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.28, ease: 'easeOut' }}>
-        <StudyCard me={me} post={post} busy={busy} />
-        <WorkoutCard me={me} post={post} busy={busy} />
-        <SkillCard me={me} post={post} busy={busy} />
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.28, ease: 'easeOut' }}>
+        <LockPanel state={state} lockedOk={tomorrowLocked} onLocked={onLocked} />
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.28, ease: 'easeOut' }}>
-        <SummaryStrip me={me} />
+        <TomorrowQuestsPanel state={state} onEdit={openTomorrowEdit} />
       </motion.div>
 
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.28, ease: 'easeOut' }}>
-        <UndoStation me={me} busy={busy} onUndo={undo} />
+      <motion.div className="space-y-4" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.28, ease: 'easeOut' }}>
+        <StudyCard me={me} post={post} busy={busy} onEdit={needsLateRescue ? undefined : openTodayEdit} />
+        <WorkoutCard me={me} post={post} busy={busy} onEdit={needsLateRescue ? undefined : openTodayEdit} />
+        <SkillCard me={me} post={post} busy={busy} onEdit={needsLateRescue ? undefined : openTodayEdit} />
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.28, ease: 'easeOut' }}>
+        <SummaryStrip me={me} />
+      </motion.div>
+
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.28, ease: 'easeOut' }}>
         <BrotherQuestsPanel state={state} />
       </motion.div>
 
+      {editTarget && <EditQuestsDialog state={state} target={editTarget} onClose={() => setEditTarget(null)} />}
+
       {/* Nightly lock prompt dialog (22:30 IST window, once per day) */}
       <Dialog open={promptOpen} onOpenChange={setPromptOpen}>
-        <DialogContent className="ember-ring border-gold/30 bg-card sm:max-w-md">
+        <DialogContent className="ember-ring max-h-[85dvh] overflow-y-auto border-gold/30 bg-card sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 font-display text-sm uppercase tracking-[0.2em]">
               <Lock className="h-4 w-4 text-gold" aria-hidden />

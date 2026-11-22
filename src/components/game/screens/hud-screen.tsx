@@ -10,7 +10,11 @@
  * Pure presentation — every number arrives via the `state` prop. No fetching.
  */
 
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { apiPost } from '@/components/game/live'
 import {
   AlertTriangle,
   CalendarClock,
@@ -18,10 +22,13 @@ import {
   FileUp,
   Flame,
   Hourglass,
+  Lock,
   Megaphone,
+  Pencil,
   Shield,
   Skull,
   Swords,
+  Undo2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { BOSS, SHIELDS, WEEKLY } from '@/engine/rules'
@@ -51,6 +58,9 @@ function relTime(createdAt: string): string {
 
 const FEED_ICONS: Record<string, { icon: LucideIcon; cls: string }> = {
   QUEST: { icon: Swords, cls: 'text-primary' },
+  QUEST_LOCK: { icon: Lock, cls: 'text-gold' },
+  QUEST_EDIT: { icon: Pencil, cls: 'text-primary' },
+  QUEST_UNDO: { icon: Undo2, cls: 'text-crimson' },
   SNITCH_GAIN: { icon: Megaphone, cls: 'text-gold' },
   SNITCH_LOSS: { icon: AlertTriangle, cls: 'text-crimson' },
   BOSS_LOOT: { icon: Crown, cls: 'text-gold' },
@@ -313,10 +323,28 @@ function FeedRow({ entry }: { entry: FeedEntry }) {
 // ---------- main export ----------
 
 export function HudScreen({ state }: { state: GameState }) {
+  const qc = useQueryClient()
   const { week, players, feed, deadlines } = state
   const bothLit =
     players.sobhnath.todayLog.netXp >= BOSS.TRIGGER_XP && players.umang.todayLog.netXp >= BOSS.TRIGGER_XP
   const bothHit = players.sobhnath.todayLog.bossHitApplied && players.umang.todayLog.bossHitApplied
+  const undoable = state.me ? players[state.me].todayLog : null
+  const [undoBusy, setUndoBusy] = useState(false)
+
+  async function undo() {
+    if (!state.me) return
+    setUndoBusy(true)
+    try {
+      const res = await apiPost<{ undone: string }>('/api/quests/undo')
+      await qc.invalidateQueries({ queryKey: ['game-state'] })
+      toast.success(`Reversed: ${res.undone}`)
+    } catch (err) {
+      await qc.invalidateQueries({ queryKey: ['game-state'] })
+      toast.error(err instanceof Error ? err.message : 'Undo failed')
+    } finally {
+      setUndoBusy(false)
+    }
+  }
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -456,7 +484,22 @@ export function HudScreen({ state }: { state: GameState }) {
       >
         <HudPanel>
           <SectionTitle
-            right={<span className="num text-[10px] text-muted-foreground">{feed.length} EVENTS</span>}
+            right={
+              <div className="flex items-center gap-2">
+                {undoable?.canUndo && (
+                  <button
+                    type="button"
+                    onClick={() => { void undo() }}
+                    disabled={undoBusy}
+                    title={`Undo last action: ${undoable.undoLabel ?? ''}`}
+                    className="inline-flex items-center gap-1 rounded-full border border-crimson/50 bg-crimson/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-crimson transition-colors hover:bg-crimson/20 disabled:opacity-50"
+                  >
+                    <Undo2 className="h-3 w-3" aria-hidden /> Undo last
+                  </button>
+                )}
+                <span className="num text-[10px] text-muted-foreground">{feed.length} EVENTS</span>
+              </div>
+            }
           >
             Live Combat Feed
           </SectionTitle>

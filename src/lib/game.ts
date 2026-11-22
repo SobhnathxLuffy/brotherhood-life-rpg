@@ -176,6 +176,20 @@ export function toLogView(log: DailyLog) {
 }
 
 /**
+ * Append an audit event to the ledger. deltaXp=0 rows are display-only —
+ * recomputeDaily only sums SNITCH and BOSS_LOOT rows, so these never touch net XP.
+ */
+export async function logEvent(
+  playerId: string,
+  logDate: string,
+  weekId: number,
+  eventType: 'QUEST_LOCK' | 'QUEST_EDIT' | 'QUEST_UNDO',
+  note: string,
+): Promise<void> {
+  await db.ledger.create({ data: { playerId, logDate, weekId, deltaXp: 0, eventType, note } })
+}
+
+/**
  * Recompute net_xp = questXp × (lockdown × late-lock) multiplier + (snitch/boss ledger deltas for that date).
  * Pure + idempotent — safe to call after any mutation. Pass `log` when the caller
  * already holds a fresh copy to save a round trip.
@@ -323,6 +337,9 @@ export async function undoLastDelta(playerId: string, dateStr: string, now: Date
     const clawBack = Math.min(entry.credited, Math.max(0, player.entBankMins))
     if (clawBack > 0) await db.player.update({ where: { id: playerId }, data: { entBankMins: { decrement: clawBack } } })
   }
+
+  // audit trail: the undo itself is a first-class event (brothers must see reversals)
+  await logEvent(playerId, dateStr, log.weekId, 'QUEST_UNDO', `Undid: ${entry.label}`)
 
   const fresh = await recomputeDaily(playerId, dateStr)
   await emit({ kind: 'XP', playerId, amount: R.round2(newQuestXp * effectiveMult(log) - log.questXp * effectiveMult(log)), message: `${player.displayName} undid: ${entry.label}` })
@@ -673,14 +690,15 @@ export async function getFullState(now: Date = new Date(), req?: Request): Promi
   const me = await currentPlayerId(req)
   // One round trip instead of eight sequential ones — this block used to chain
   // ~10 awaits, which on serverless × Supabase latency was the visible lag.
-  const [players, logsToday, earnedTodayRows, weeklySums, totalSums, openSessions, feed, punishments] = await Promise.all([
+  const [players, logsToday, logsTomorrow, earnedTodayRows, weeklySums, totalSums, openSessions, feed, punishments] = await Promise.all([
     db.player.findMany(),
     db.dailyLog.findMany({ where: { logDate: today } }),
+    db.dailyLog.findMany({ where: { logDate: istDateOffset(1, now) } }),
     db.ledger.findMany({ where: { logDate: today, deltaXp: { gt: 0 } } }),
     db.dailyLog.groupBy({ by: ['playerId'], _sum: { netXp: true }, where: { weekId: week.id } }),
     db.dailyLog.groupBy({ by: ['playerId'], _sum: { netXp: true }, where: { playerId: { in: R.PLAYER_IDS } } }),
     db.entSession.findMany({ where: { endedAt: null } }),
-    db.ledger.findMany({ orderBy: { createdAt: 'desc' }, take: 30 }),
+    db.ledger.findMany({ orderBy: { createdAt: 'desc' }, take: 150 }),
     db.punishment.findMany({ orderBy: { logDate: 'desc' }, take: 10 }),
   ])
   // Rebuild exactly what the vault credited today, event by event:
@@ -730,6 +748,10 @@ export async function getFullState(now: Date = new Date(), req?: Request): Promi
           level: R.levelFromTotalXp(totalXp),
           watching: openSessions.some((s) => s.playerId === pid),
           watchingSince: openSessions.find((s) => s.playerId === pid)?.startedAt.toISOString() ?? null,
+          tomorrowLog: (() => {
+            const tl = logsTomorrow.find((l) => l.playerId === pid)
+            return tl ? toLogView(tl) : null
+          })(),
         },
       ]
     }),
