@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Brotherhood Life RPG — Setup &amp; Play Guide</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+@page { size: 720px 1020px; margin: 0; }
+:root {
+  --bg: #0B0E14;
+  --panel: #12161F;
+  --text: #E8E6E3;
+  --muted: #8B93A3;
+  --cyan: #22D3EE;
+  --emerald: #34D399;
+}
+html, body {
+  margin: 0; padding: 0;
+  width: 720px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', 'Noto Sans SC', sans-serif;
+  line-break: strict;
+}
+p, td, li, .body-text { overflow-wrap: break-word; word-break: break-word; }
+@media screen {
+  html { height: auto; display: flex; justify-content: center; background: #0B0E14; }
+  body { transform-origin: top center; margin: 20px auto; }
+}
+
+/* ---------- Cover ---------- */
+.cover {
+  width: 720px; height: 1020px; box-sizing: border-box;
+  break-after: page; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 60px 65px; position: relative;
+}
+.cover .deco-ring {
+  position: absolute; top: 48px; right: 52px;
+  width: 180px; height: 180px; border-radius: 50%;
+  border: 1px solid rgba(34,211,238,0.25);
+}
+.cover .deco-ring2 {
+  position: absolute; top: 96px; right: 108px;
+  width: 120px; height: 120px; border-radius: 50%;
+  border: 1px solid rgba(52,211,153,0.2);
+}
+.cover .deco-grid {
+  position: absolute; bottom: 150px; left: 65px; right: 65px;
+  height: 1px; background: linear-gradient(90deg, rgba(34,211,238,0.5), rgba(34,211,238,0) 70%);
+}
+.cover-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid rgba(34,211,238,0.45); border-radius: 4px;
+  padding: 6px 14px; font-size: 11px; letter-spacing: 3px;
+  color: var(--cyan); text-transform: uppercase; width: fit-content;
+  font-weight: 600; margin-bottom: 28px;
+}
+.cover-title { font-size: 56px; font-weight: 900; line-height: 1.02; letter-spacing: -1px; }
+.cover-title .accent { color: var(--cyan); }
+.cover-sub { margin-top: 22px; font-size: 16px; line-height: 1.6; color: var(--muted); max-width: 480px; }
+.cover-players { display: flex; gap: 14px; margin-top: 42px; }
+.cover-player {
+  flex: 1 1 auto; min-width: 120px; max-width: 100%;
+  border: 1px solid rgba(34,211,238,0.35); border-radius: 8px;
+  padding: 16px 18px; background: rgba(34,211,238,0.06);
+}
+.cover-player.um { border-color: rgba(52,211,153,0.35); background: rgba(52,211,153,0.06); }
+.cover-player .name { font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.cover-player.sob .name { color: var(--cyan); }
+.cover-player.um .name { color: var(--emerald); }
+.cover-player .role { margin-top: 6px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.cover-meta {
+  position: absolute; bottom: 62px; left: 65px; right: 65px;
+  display: flex; justify-content: space-between; align-items: flex-end;
+  font-size: 10px; letter-spacing: 2px; color: var(--muted); text-transform: uppercase;
+}
+.cover-meta .mono { font-family: 'Liberation Mono', 'DejaVu Sans Mono', monospace; }
+
+/* ---------- Flowing content ---------- */
+.main-content { padding: 58px 65px 40px 65px; }
+.chapter-header { break-after: avoid; break-inside: avoid; margin-top: 26px; }
+.chapter-header:first-child { margin-top: 0; }
+.section-tag {
+  font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--cyan); font-weight: 700; margin-bottom: 8px;
+}
+.section-title { font-size: 26px; font-weight: 900; letter-spacing: -0.3px; }
+.divider {
+  height: 1px; margin: 14px 0 16px 0;
+  background: linear-gradient(90deg, rgba(34,211,238,0.55), rgba(34,211,238,0) 75%);
+}
+.body-text { font-size: 13.5px; line-height: 1.7; color: var(--text); margin-bottom: 12px; font-weight: 400; }
+.body-text b { font-weight: 700; color: #fff; }
+.body-text .cy { color: var(--cyan); font-weight: 600; }
+.body-text .em { color: var(--emerald); font-weight: 600; }
+
+.card {
+  break-inside: avoid; margin-bottom: 12px;
+  border: 1px solid rgba(139,147,163,0.22); border-radius: 8px;
+  background: var(--panel); padding: 14px 16px;
+}
+.card .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.card .card-title { font-size: 13px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.card .card-title .cy { color: var(--cyan); }
+.card .card-title .em { color: var(--emerald); }
+.card .card-note { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
+.card .card-body { margin-top: 7px; font-size: 12.5px; line-height: 1.65; color: var(--muted); }
+.card .card-body b { color: var(--text); }
+
+.steps .card { position: relative; }
+.step-num {
+  display: inline-block; width: 22px; height: 22px; border-radius: 50%;
+  border: 1px solid rgba(34,211,238,0.6); color: var(--cyan);
+  font-size: 11px; font-weight: 800; text-align: center; line-height: 22px;
+  margin-right: 9px; vertical-align: 1px;
+}
+.code {
+  font-family: 'Liberation Mono', 'DejaVu Sans Mono', monospace;
+  font-size: 10.5px; line-height: 1.6; color: var(--cyan);
+  background: #080B10; border: 1px solid rgba(34,211,238,0.2);
+  border-radius: 6px; padding: 10px 12px; margin: 8px 0 4px 0;
+  overflow-wrap: break-word; word-break: break-all; white-space: pre-wrap;
+}
+.code em { color: var(--muted); font-style: normal; }
+
+table { width: 100%; border-collapse: collapse; margin: 10px 0 6px 0; break-inside: avoid; }
+th {
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--cyan);
+  text-align: left; padding: 7px 9px; border-bottom: 1px solid rgba(34,211,238,0.35); font-weight: 700;
+}
+td {
+  font-size: 11.5px; line-height: 1.55; color: var(--muted);
+  padding: 8px 9px; border-bottom: 1px solid rgba(139,147,163,0.14);
+  vertical-align: top; overflow-wrap: break-word;
+}
+td b { color: var(--text); font-weight: 700; }
+.callout {
+  break-inside: avoid; margin: 12px 0;
+  border-left: 3px solid var(--emerald); border-radius: 0 8px 8px 0;
+  background: rgba(52,211,153,0.07); padding: 12px 16px;
+  font-size: 12.5px; line-height: 1.65; color: var(--text);
+}
+.callout.amber-c { border-left-color: var(--cyan); background: rgba(34,211,238,0.07); }
+
+/* ---------- Ending ---------- */
+.ending {
+  width: 720px; height: 1020px; box-sizing: border-box;
+  break-before: page; overflow: hidden; position: relative;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 60px 65px;
+}
+.ending .deco-ring {
+  position: absolute; bottom: 120px; left: 52px;
+  width: 170px; height: 170px; border-radius: 50%;
+  border: 1px solid rgba(52,211,153,0.22);
+}
+.ending .big { font-size: 40px; font-weight: 900; line-height: 1.15; letter-spacing: -0.5px; }
+.ending .big .cy { color: var(--cyan); }
+.ending .big .em { color: var(--emerald); }
+.ending .sub { margin-top: 20px; font-size: 14px; line-height: 1.7; color: var(--muted); max-width: 480px; }
+.ending .meta {
+  position: absolute; bottom: 62px; left: 65px; right: 65px;
+  display: flex; justify-content: space-between;
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted);
+}
+</style>
+</head>
+<body>
+
+<!-- ================= COVER ================= -->
+<div class="cover">
+  <div class="deco-ring"></div>
+  <div class="deco-ring2"></div>
+  <div class="cover-badge">Setup &amp; Play Guide</div>
+  <div class="cover-title">Brotherhood<br>Life RPG<br><span class="accent">Field Manual</span></div>
+  <div class="cover-sub">Two brothers. One shared boss. Everything lives on one server, so every phone sees the same war in real time. This manual covers daily play, device setup, user switching, and the fifteen-minute path to a live deployment.</div>
+  <div class="cover-players">
+    <div class="cover-player sob">
+      <div class="name">Sobhnath</div>
+      <div class="role">1x vault rate · physical punishment track · JEE study import bridge</div>
+    </div>
+    <div class="cover-player um">
+      <div class="name">Umang</div>
+      <div class="role">2x vault rate · verification gate for every punishment sign-off</div>
+    </div>
+  </div>
+  <div class="deco-grid"></div>
+  <div class="cover-meta">
+    <span>Edition 1.0 · November 2026</span>
+    <span class="mono">HUD · QUESTS · VAULT · ARENA · CHAMBER</span>
+  </div>
+</div>
+
+<!-- ================= FLOWING CONTENT ================= -->
+<div class="main-content">
+
+  <!-- CH 1 -->
+  <div class="chapter-header">
+    <div class="section-tag">Chapter 01</div>
+    <div class="section-title">The five screens, in one page</div>
+    <div class="divider"></div>
+  </div>
+  <div class="body-text">Every screen has one job, and together they run the whole week. You do not need to memorise the rules — the app computes every number server-side, so what you see is always the truth. Use this page as the map; the app itself teaches the details as you tap.</div>
+  <div class="card">
+    <div class="card-head"><span class="card-title"><span class="cy">HUD</span> — command center</span><span class="card-note">watch</span></div>
+    <div class="card-body">Both brothers' Weekly HP, today's XP, streaks, shields and the <b>WATCHING NOW</b> badge, plus the shared co-op Boss with its pixel titan and HP bar. The two trigger lamps beside the boss mean "≥70 XP today"; when <b>both lamps are lit</b>, the boss takes −140 automatically and the screen shakes.</div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title"><span class="cy">Quests</span> — the daily grind</span><span class="card-note">tap + as you do it</span></div>
+    <div class="card-body">Write <b>tomorrow's three quests</b> (study / workout / skill) at night and lock them before <b>23:30 IST</b> — locked quests are read-only the next day, so goalposts cannot move. Through the day, tap the <b>+</b> buttons to log real progress; every card shows a live XP preview, and Sobhnath also gets the drag-drop JEE JSON import on the study card.</div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title"><span class="cy">Vault</span> — entertainment bank</span><span class="card-note">spend what you earned</span></div>
+    <div class="card-body">Every XP earned becomes guilt-free minutes: <b>1 XP = 1 min</b> for Sobhnath, <b>1 XP = 2 min</b> for Umang. Press <b>START WATCHING</b> before gaming or YouTube and the stopwatch drains your bank live — your brother sees it on his phone too. Lockdown days hard-disable spending.</div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title"><span class="cy">Arena</span> — weekly war room</span><span class="card-note">snitch · shields · stakes</span></div>
+    <div class="card-body">The PvP tug-of-war bar, the weekly stake (₹50 treat or a 2-day chore) with Sunday countdown, and the <b>Snitch Tribunal</b>: report cheating to steal up to 30 XP. Repeat offenders get lockdown; cheating during lockdown forfeits PvP and heals the boss. Rest Shields and the 18:00 IST Override live here too.</div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title"><span class="cy">Chamber</span> — punishment hall</span><span class="card-note">Umang's PIN only</span></div>
+    <div class="card-body">Sobhnath's debt forecast: every XP short of 100 becomes exact reps — pushups ×1, pullups ×0.5, crunches ×1, squats ×2, with 5 kg / 2.5 kg weights. Midnight locks the ticket. Next morning Sobhnath does the reps while Umang watches and signs the ticket off with <b>his PIN</b> — no PIN, no forgiveness.</div>
+  </div>
+
+  <!-- CH 2 -->
+  <div class="chapter-header">
+    <div class="section-tag">Chapter 02</div>
+    <div class="section-title">Two phones, one game</div>
+    <div class="divider"></div>
+  </div>
+  <div class="body-text">All game state lives on the <b>server</b>, never inside a phone. That single fact makes everything simple: the same URL, opened on two different devices, shows the same HP bar, the same vault countdown, and the same combat feed. When Sobhnath logs a workout on his phone, Umang's HUD updates within about four seconds — the app polls the server continuously, and live socket events push the big moments (boss hits, snitches) instantly.</div>
+  <div class="body-text">Setup is one step per person. Open the app URL, pick your name on the login screen, enter your four-digit PIN, and you are in. The session <b>sticks for 30 days</b>, so each brother normally logs in exactly once per month. From then on, daily use is just: lock quests at night, tap "+" through the day, press START in the Vault before watching anything.</div>
+  <div class="callout"><b>Install it as an app:</b> on Android Chrome open the URL → menu → <b>Install app</b>; it becomes a full-screen icon like any other game. On desktop (CachyOS), launch a standalone window with <b>brave --app=https://your-url</b>.</div>
+  <div class="body-text">Right now, in this preview, the app runs against a local development database — it already behaves exactly like the finished product because everything is already server-side. Chapter 04 walks you through moving it to its permanent home on the internet so both phones can reach it from anywhere.</div>
+
+  <!-- CH 3 -->
+  <div class="chapter-header">
+    <div class="section-tag">Chapter 03</div>
+    <div class="section-title">Switching users with a PIN</div>
+    <div class="divider"></div>
+  </div>
+  <div class="body-text">One shared device is fully supported. The amber <b>user-switch button</b> sits in the top-right header, next to Settings — or open Settings ⚙ and tap <b>Switch user</b>. Pick the brother taking the seat, enter <b>his</b> four-digit PIN, and the app swaps sessions instantly: his HUD, his vault, his cards.</div>
+  <div class="body-text">The switch is a hard swap, on purpose. Entering Umang's PIN signs Sobhnath out of that device completely — his token is replaced, so his account cannot be browsed without his PIN. Switching back needs Sobhnath's PIN again. Two brothers can share one phone indefinitely without ever seeing each other's business, and on separate devices the feature simply never needs to be touched.</div>
+  <div class="callout amber-c"><b>Wrong PIN?</b> The seat stays with the current player and the attempt is logged. After ten failed attempts in ten minutes, login locks for a few minutes — brute-forcing a brother's PIN is not a strategy.</div>
+  <table>
+    <tr><th>Scenario</th><th>What happens</th></tr>
+    <tr><td><b>Sobhnath's phone, Umang visiting</b></td><td>Umang taps the switch button, enters his PIN, uses his account; Sobhnath re-enters his PIN to take the seat back.</td></tr>
+    <tr><td><b>Forgot a PIN</b></td><td>The other brother can check Settings; PINs can only be changed from inside a logged-in session, so never both log out at once.</td></tr>
+    <tr><td><b>New device</b></td><td>Just log in with that brother's PIN — sessions are per-device, nothing else migrates.</td></tr>
+  </table>
+
+  <!-- CH 4 -->
+  <div class="chapter-header">
+    <div class="section-tag">Chapter 04</div>
+    <div class="section-title">Go live: Supabase + Vercel in 15 minutes</div>
+    <div class="divider"></div>
+  </div>
+  <div class="body-text">The app is a Next.js project with all logic in server APIs, so "deploying" means two things: a free <b>Postgres database</b> (Supabase) and a free <b>host</b> (Vercel). No code changes are needed, because the database is just a connection string. Supabase's Mumbai region gives the lowest latency for IST schedules. Everything below runs on free tiers.</div>
+  <div class="steps">
+    <div class="card">
+      <div class="card-head"><span class="card-title"><span class="step-num">1</span><span class="cy">Create the database</span></span><span class="card-note">supabase.com</span></div>
+      <div class="card-body">New project → region <b>Mumbai (ap-south-1)</b> → create. Open the project, press <b>Connect</b> in the top bar, and copy both pooler URIs. Keep the password handy — you will paste it twice in step 3.</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title"><span class="step-num">2</span><span class="cy">Push the code</span></span><span class="card-note">github.com</span></div>
+      <div class="card-body">The repo is already live at <b>github.com/SobhnathxLuffy/brotherhood-life-rpg</b>. If you ever edit the app locally, commit and push again — Vercel redeploys automatically on every push to main.</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title"><span class="step-num">3</span><span class="cy">Import into Vercel</span></span><span class="card-note">vercel.com</span></div>
+      <div class="card-body">Sign in with GitHub → <b>Add New → Project</b> → import the repo. The build works with zero configuration. Before pressing Deploy, open <b>Settings → Environment Variables</b> and add the four values from the table below — then deploy.</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title"><span class="step-num">4</span><span class="cy">Environment variables</span></span><span class="card-note">paste exactly</span></div>
+      <div class="card-body"><b>DATABASE_URL</b> = Supabase transaction pooler URI (port 6543) with <b>?pgbouncer=true&amp;connection_limit=1</b> appended. <b>DIRECT_URL</b> = session pooler URI (port 5432). <b>AUTH_SECRET</b> and <b>CRON_SECRET</b> = any two long random strings (make them with <b>openssl rand -hex 32</b> in any terminal). These four are the only credentials the app ever needs.</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title"><span class="step-num">5</span><span class="cy">Create the tables — once</span></span><span class="card-note">1 minute</span></div>
+      <div class="card-body">On your computer, swap in the production schema and push it to Supabase:</div>
+      <div class="code">cp prisma/schema.postgres.prisma prisma/schema.prisma
+DATABASE_URL="&lt;DIRECT_URL&gt;" DIRECT_URL="&lt;DIRECT_URL&gt;" npx prisma db push</div>
+      <div class="card-body">Then commit the swapped schema file. Tables are created in the cloud; nothing is lost later because all data lives there.</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title"><span class="step-num">6</span><span class="cy">Cron + install on phones</span></span><span class="card-note">optional polish</span></div>
+      <div class="card-body">Midnight rollovers already run whenever either brother opens the app, so cron is optional. For exact 00:01 IST timing even when the app is closed, add a free <b>cron-job.org</b> job hitting <b>your-app.vercel.app/api/cron</b> every 5 minutes with header <b>x-cron-secret</b>. Then install the PWA on both phones (Chapter 02) and log in once each.</div>
+    </div>
+  </div>
+  <div class="callout"><b>Supabase connected yet?</b> Not in this preview — the preview uses a local SQLite file so you can play instantly with zero setup. "Connecting Supabase" is exactly step 1 + the four variables in step 3. Until then nothing is missing locally.</div>
+
+  <!-- CH 5 -->
+  <div class="chapter-header">
+    <div class="section-tag">Chapter 05</div>
+    <div class="section-title">Where credentials live — and never live</div>
+    <div class="divider"></div>
+  </div>
+  <div class="body-text">The architecture already follows the boring-but-correct rule: <b>secrets belong in the platform's secret store, never in code</b>. No password, token, or connection string is written in the repository — the tracked <b>.env.example</b> holds placeholders only, and the real <b>.env</b> is permanently git-ignored. Vercel stores the four production variables encrypted and injects them at runtime; Supabase keeps the database password in its dashboard; the phones hold nothing but a 30-day signed session token.</div>
+  <div class="body-text">PINs are protected with the same machinery serious apps use: each PIN is hashed with <b>scrypt and a per-player salt</b> before it touches the database, so even a full database leak cannot reveal a PIN. Sessions are HMAC-signed tokens — flipping a single character invalidates them. The GitHub token used to push this repo lives in your account settings, not in any file, and can be revoked from GitHub at any time without touching the app.</div>
+  <div class="body-text">If a secret ever does leak, rotation is a two-minute affair: paste new values for <b>AUTH_SECRET</b> or <b>CRON_SECRET</b> in Vercel (everyone simply logs in again) and reset the database password in Supabase. Nothing in the game data needs to change.</div>
+  <table>
+    <tr><th>Secret</th><th>Stored in</th><th>Leak plan</th></tr>
+    <tr><td><b>Player PINs</b></td><td>scrypt hashes in the database</td><td>Change PIN in Settings</td></tr>
+    <tr><td><b>AUTH_SECRET / CRON_SECRET</b></td><td>Vercel environment variables</td><td>Rotate in Vercel, re-login</td></tr>
+    <tr><td><b>Database password</b></td><td>Supabase dashboard</td><td>Reset in Supabase, update Vercel</td></tr>
+    <tr><td><b>GitHub token</b></td><td>GitHub settings only</td><td>Revoke / regenerate on GitHub</td></tr>
+  </table>
+
+  <!-- CH 6 -->
+  <div class="chapter-header">
+    <div class="section-tag">Chapter 06</div>
+    <div class="section-title">Quick troubleshooting</div>
+    <div class="divider"></div>
+  </div>
+  <div class="body-text">Ninety percent of "it stopped working" moments resolve in one refresh, because the app self-heals: it polls every four seconds and re-runs any missed scheduler job the moment somebody opens it. The rest of the time, this table finds the fix fast.</div>
+  <table>
+    <tr><th>Symptom</th><th>Cause &amp; fix</th></tr>
+    <tr><td><b>Back to the login screen</b></td><td>The 30-day session expired or the browser cleared storage. Log in again — data is on the server, nothing is lost.</td></tr>
+    <tr><td><b>Brother's screen not updating</b></td><td>His phone lost the connection; refresh once. Polling resumes automatically.</td></tr>
+    <tr><td><b>"Too many attempts"</b></td><td>Ten wrong PINs in ten minutes. Wait a few minutes — the lock clears itself.</td></tr>
+    <tr><td><b>Deploy shows a database error</b></td><td>Check the four environment variables letter-by-letter; the port 6543 URL must carry the <b>?pgbouncer=true</b> suffix.</td></tr>
+    <tr><td><b>Tables missing on Vercel</b></td><td>Run the one-time <b>prisma db push</b> from Chapter 04 step 5.</td></tr>
+    <tr><td><b>Clock looks wrong</b></td><td>It never is — the server runs everything in IST regardless of the device clock.</td></tr>
+  </table>
+  <div class="card">
+    <div class="card-head"><span class="card-title"><span class="cy">Pre-launch checklist</span></span><span class="card-note">30 seconds</span></div>
+    <div class="card-body"><b>1.</b> Both PINs changed from the defaults in Settings ⚙. &nbsp;<b>2.</b> Today's three quests locked in Quests before 23:30 IST. &nbsp;<b>3.</b> The app installed on both phones (PWA) and each brother logged in once. &nbsp;<b>4.</b> After deploying: all four environment variables present, <b>prisma db push</b> ran once, and <b>/api/cron</b> answers your cron job. &nbsp;<b>5.</b> First boss fight scheduled — both brothers above 70 XP on the same day. Good hunting.</div>
+  </div>
+
+</div>
+
+<!-- ================= ENDING ================= -->
+<div class="ending">
+  <div class="deco-ring"></div>
+  <div class="big">Same URL.<br><span class="cy">Two brothers.</span><br><span class="em">Two PINs.</span><br>One boss.</div>
+  <div class="sub">Lock tonight's quests, earn tomorrow's vault minutes, and let the ledger do the arguing. Everything else in this manual exists so that the only thing left to dispute is who actually did the reps.</div>
+  <div class="meta">
+    <span>Brotherhood Life RPG · Field Manual</span>
+    <span>github.com/SobhnathxLuffy/brotherhood-life-rpg</span>
+  </div>
+</div>
+
+</body>
+</html>
