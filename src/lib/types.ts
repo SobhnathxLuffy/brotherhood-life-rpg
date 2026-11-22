@@ -106,7 +106,7 @@ export interface GameState {
 }
 
 export interface SocketEvent {
-  kind: 'XP' | 'BOSS_HIT' | 'BOSS_LOOT' | 'SNITCH' | 'HP' | 'ENT' | 'PVP' | 'PUNISH' | 'LOCK' | 'WEEK'
+  kind: 'XP' | 'BOSS_HIT' | 'BOSS_LOOT' | 'SNITCH' | 'HP' | 'ENT' | 'PVP' | 'PUNISH' | 'LOCK' | 'WEEK' | 'RESET'
   playerId?: string
   amount?: number
   message?: string

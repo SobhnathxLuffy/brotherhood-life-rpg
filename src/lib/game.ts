@@ -791,3 +791,55 @@ export async function changePin(playerId: string, currentPin: string, newPin: st
   if (!/^\d{4}$/.test(newPin)) throw new GameError('PIN must be exactly 4 digits.')
   await db.player.update({ where: { id: playerId }, data: { pinHash: hashPin(newPin) } })
 }
+
+// ============================ FRESH START (FULL WIPE) ============================
+
+/**
+ * Nuke EVERYTHING and start a brand-new game for both brothers: every DailyLog,
+ * Week (boss battles, PvP), Punishment ticket, entertainment session, vault
+ * balance, shield, streak — and the ledger itself. Identity survives: logins,
+ * PINs, display names and vault multipliers stay exactly as they are.
+ *
+ * The ONE thing that persists is the audit fact: a GAME_RESET ledger row is
+ * written as the first entry of the new history, naming who pulled the trigger
+ * and when — so the History tab always answers "who restarted the game?".
+ * The new game officially starts today (game_start_date is moved forward), so
+ * days from the old game are never rolled over again and can't penalize the
+ * fresh run.
+ */
+export async function resetGame(actorId: PId, now: Date = new Date()) {
+  const actor = await db.player.findUniqueOrThrow({ where: { id: actorId } })
+  const before = {
+    logs: await db.dailyLog.count(),
+    weeks: await db.week.count(),
+    ledger: await db.ledger.count(),
+    punishments: await db.punishment.count(),
+    sessions: await db.entSession.count(),
+  }
+
+  // FK order matters: DailyLog → Week, so logs die before their weeks do.
+  await db.$transaction([
+    db.dailyLog.deleteMany({}),
+    db.entSession.deleteMany({}),
+    db.punishment.deleteMany({}),
+    db.ledger.deleteMany({}),
+    db.week.deleteMany({}),
+  ])
+
+  // Progress is wiped; identity is not — PINs and multipliers keep everyone logged in.
+  await db.player.updateMany({ data: { entBankMins: 0, shieldsCount: 0, current70Streak: 0, lastOverrideAt: null } })
+
+  // The fresh game begins today — old dates are never re-rolled for this run.
+  const today = istDateStr(now)
+  await db.appMeta.upsert({ where: { key: 'game_start_date' }, update: { value: today }, create: { key: 'game_start_date', value: today } })
+
+  // Brand-new week 1: fresh boss at 700 HP, fresh PvP HP bars.
+  const week = await ensureWeek(now)
+
+  // The surviving audit row — who did it, in their own history, forever.
+  const note = `GAME RESTART — ${actor.displayName} wiped ALL game data (${before.logs} day-logs, ${before.weeks} weeks, ${before.ledger} ledger rows, ${before.punishments} punishment tickets, ${before.sessions} watch sessions). Fresh game started — new boss, zero XP, empty vaults.`
+  await db.ledger.create({ data: { playerId: actorId, logDate: today, weekId: week.id, deltaXp: 0, eventType: 'GAME_RESET', note } })
+
+  await emit({ kind: 'RESET', message: `FRESH GAME! ${actor.displayName} wiped everything — Week 1 vs ${week.bossName} begins now.` })
+  return { wiped: before, startDate: today, bossName: week.bossName }
+}

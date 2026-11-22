@@ -16,6 +16,7 @@ import {
   Lock,
   Megaphone,
   Pencil,
+  RotateCcw,
   Swords,
   Undo2,
 } from 'lucide-react'
@@ -33,11 +34,13 @@ const EVENT_META: Record<string, { label: string; icon: LucideIcon; cls: string 
   SNITCH_LOSS: { label: 'Snitch penalty', icon: AlertTriangle, cls: 'text-crimson' },
   BOSS_LOOT: { label: 'Boss loot', icon: Crown, cls: 'text-gold' },
   JEE_IMPORT: { label: 'JEE import', icon: FileUp, cls: 'text-sobh' },
+  GAME_RESET: { label: 'Game restart', icon: RotateCcw, cls: 'text-crimson' },
 }
 const FALLBACK_META = { label: 'Event', icon: Swords, cls: 'text-muted-foreground' }
 
 type WhoFilter = 'all' | PId
-type KindFilter = 'all' | 'quests' | 'xp'
+type KindFilter = 'all' | 'quests' | 'xp' | 'restarts'
+const GOVERNANCE_EVENTS = ['QUEST_LOCK', 'QUEST_EDIT', 'QUEST_UNDO']
 
 function playerColor(playerId: string, displayName: string): string {
   if (playerId === 'sobhnath') return 'text-sobh'
@@ -109,11 +112,12 @@ export function HistoryScreen({ state }: { state: GameState }) {
 
   const rows = state.feed.filter((e) => {
     if (who !== 'all' && e.playerId !== who) return false
-    if (kind === 'quests') return ['QUEST_LOCK', 'QUEST_EDIT', 'QUEST_UNDO'].includes(e.eventType)
-    if (kind === 'xp') return !['QUEST_LOCK', 'QUEST_EDIT', 'QUEST_UNDO'].includes(e.eventType)
+    if (kind === 'quests') return GOVERNANCE_EVENTS.includes(e.eventType)
+    if (kind === 'xp') return !GOVERNANCE_EVENTS.includes(e.eventType) && e.eventType !== 'GAME_RESET'
+    if (kind === 'restarts') return e.eventType === 'GAME_RESET'
     return true
   })
-  const lockEditCount = state.feed.filter((e) => ['QUEST_LOCK', 'QUEST_EDIT', 'QUEST_UNDO'].includes(e.eventType)).length
+  const lockEditCount = state.feed.filter((e) => GOVERNANCE_EVENTS.includes(e.eventType)).length
 
   return (
     <div className="flex w-full flex-col gap-4">
@@ -136,6 +140,7 @@ export function HistoryScreen({ state }: { state: GameState }) {
               <FilterChip active={kind === 'all'} onClick={() => setKind('all')}>All events</FilterChip>
               <FilterChip active={kind === 'quests'} onClick={() => setKind('quests')}>Locks · Edits · Undos</FilterChip>
               <FilterChip active={kind === 'xp'} onClick={() => setKind('xp')}>XP &amp; loot</FilterChip>
+              <FilterChip active={kind === 'restarts'} onClick={() => setKind('restarts')}>Game restarts</FilterChip>
             </div>
           </div>
         </HudPanel>
