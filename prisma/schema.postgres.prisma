@@ -1,8 +1,8 @@
 generator client {
   provider      = "prisma-client-js"
-  // Vercel serverless functions run on Amazon Linux (OpenSSL 3) — bundle that
-  // engine alongside the native one so the client works at runtime on Vercel.
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  // Vercel serverless functions run on Amazon Linux — bundle BOTH OpenSSL
+  // variants (AL2 = 1.1.x, AL2023 = 3.0.x) so the client always finds its engine.
+  binaryTargets = ["native", "rhel-openssl-1.1.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {

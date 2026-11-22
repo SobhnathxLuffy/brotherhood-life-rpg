@@ -9,6 +9,9 @@ const EMIT_TOKEN = process.env.EMIT_TOKEN || 'brotherhood-emit-local'
  * polling fallback keeps the UI fresh anyway.
  */
 export async function emit(ev: SocketEvent) {
+  // No localhost socket service exists on serverless deployments — skip the
+  // doomed fetch entirely there (polling keeps the UI fresh).
+  if (process.env.NODE_ENV === 'production') return
   try {
     await fetch(`http://127.0.0.1:${process.env.SOCKET_PORT || 3003}/emit`, {
       method: 'POST',

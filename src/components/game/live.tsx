@@ -73,6 +73,9 @@ export function useLiveEvents(onEvent: (ev: SocketEvent) => void) {
   }, [onEvent])
 
   useEffect(() => {
+    // No socket.io mini-service exists on serverless deployments (Vercel) —
+    // skip connecting there entirely and rely on the 4s polling fallback.
+    if (process.env.NODE_ENV === 'production') return
     const socket: Socket = io('/?XTransformPort=3003', { transports: ['websocket', 'polling'], reconnectionDelayMax: 10000 })
     socket.on('sync', (ev: SocketEvent) => {
       handlerRef.current(ev)
