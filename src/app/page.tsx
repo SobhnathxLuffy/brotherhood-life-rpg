@@ -3,12 +3,13 @@
 import { useCallback, useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Command, Swords, Coins, Skull, Dumbbell, Settings, LogOut, Shield } from 'lucide-react'
+import { Command, Swords, Coins, Skull, Dumbbell, Settings, Shield, UserRoundCog } from 'lucide-react'
 import { QueryClientProvider, apiPost, useGameProvider, useGameState, useLiveEvents } from '@/components/game/live'
 import { FxLayer, type FxEvent } from '@/components/game/fx'
 import { HudPanel, ActionButton } from '@/components/game/ui'
 import { AuthGate } from '@/components/game/auth-gate'
 import { SettingsDialog } from '@/components/game/settings-dialog'
+import { SwitchUserDialog } from '@/components/game/switch-user-dialog'
 import { HudScreen } from '@/components/game/screens/hud-screen'
 import { QuestsScreen } from '@/components/game/screens/quests-screen'
 import { VaultScreen } from '@/components/game/screens/vault-screen'
@@ -42,6 +43,7 @@ function GameShell() {
   const [events, setEvents] = useState<FxEvent[]>([])
   const [shake, setShake] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [switchOpen, setSwitchOpen] = useState(false)
 
   const onEvent = useCallback((ev: SocketEvent) => {
     const eid = Date.now() + Math.random()
@@ -103,6 +105,11 @@ function GameShell() {
                   {myPlayer.displayName}
                 </span>
               )}
+              {state.me && (
+                <button onClick={() => setSwitchOpen(true)} aria-label="Switch user" title="Switch user (PIN required)" className="rounded border border-amber-400/40 bg-amber-400/10 p-2 text-amber-200 hover:bg-amber-400/20">
+                  <UserRoundCog className="h-4 w-4" />
+                </button>
+              )}
               <button onClick={() => setSettingsOpen(true)} aria-label="Settings" className="rounded border border-border p-2 text-muted-foreground hover:text-foreground">
                 <Settings className="h-4 w-4" />
               </button>
@@ -158,7 +165,8 @@ function GameShell() {
           </div>
         </nav>
 
-        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} state={state} />
+        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} state={state} onRequestSwitch={() => { setSettingsOpen(false); setSwitchOpen(true) }} />
+        <SwitchUserDialog open={switchOpen} onOpenChange={setSwitchOpen} state={state} />
       </motion.div>
     </div>
   )

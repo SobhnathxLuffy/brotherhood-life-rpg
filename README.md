@@ -34,6 +34,13 @@ bun run dev              # http://localhost:3000
 
 First login PINs: **Sobhnath 1111 · Umang 2222** — pick your name, the login screen shows your default PIN (tap it to fill), then change it in Settings ⚙ immediately. Multi-device: open the same URL on both phones, each signs in as its own brother with its PIN. Login works everywhere — normal browsers (session cookie) AND embedded preview windows/iframes (bearer token, stored automatically after login) — so the tabs always unlock after entering your PIN. The game's clock starts the first day the app is booted (`game_start_date`) — days before that never count, so a fresh install starts clean at 100 HP.
 
+## Two brothers, two devices (or one shared device)
+
+All state lives on the **server** (database), never in the phone — so every device sees the same HP, vault, and combat feed within ~4 seconds.
+
+- **Separate devices (recommended)** — Sobhnath opens the URL on his phone and logs in as Sobhnath once; Umang opens the same URL on his phone and logs in as Umang once. The session sticks for 30 days. Both phones then just work: quest progress, vault drains, snitches, boss hits all sync automatically.
+- **One shared device** — tap the amber **switch-user button** (top-right, next to ⚙ Settings, or Settings → *Switch user*): pick the other brother, enter **his** PIN, and the seat swaps instantly. Switching signs the previous player out of that device — switching back always needs the other PIN, so nobody ever sees the other's account.
+
 ## The 5 screens — what each one is
 
 | Tab | What it is | What you do there |
@@ -56,14 +63,66 @@ First login PINs: **Sobhnath 1111 · Umang 2222** — pick your name, the login 
 8. **Next morning** — Sobhnath does the reps; Umang watches and signs the ticket off with **his** PIN in the **Chamber**. No PIN, no forgiveness.
 9. **Sunday 22:00 IST** — PvP settles (KO beats XP-diff; both KO = draw). Loser pays the stake, winner marks **STAKE PAID**; Monday a fresh boss spawns.
 
-## Deploy (free)
+## Deploy — the finished product (free, ~15 minutes)
 
-1. Push this repo to GitHub → import in **Vercel** (zero config, `bun run build` works out of the box).
-2. Create a free Postgres (Neon or Supabase). Copy `prisma/schema.postgres.prisma` over `prisma/schema.prisma`, set `DATABASE_URL` + `AUTH_SECRET` in Vercel env, run `npx prisma db push` locally against the prod URL once.
-3. Point a free cron (cron-job.org) at `https://your-app.vercel.app/api/cron` every 5 min (optional — the opportunistic scheduler already covers it while the app is open).
-4. PWA: "Install app" on Android; on desktop launch standalone via `brave --app=https://your-app.vercel.app`.
+The app already stores everything server-side, so a deploy is literally: host it + give it a Postgres. Supabase is the recommended database (free tier, Mumbai region for lowest IST latency, zero code changes — it's just a `DATABASE_URL`).
 
-The pure-Supabase path (schema + pg_cron in IST) lives in `supabase/`.
+### Step 1 — Database (Supabase)
+
+1. [supabase.com](https://supabase.com) → **New project** → pick a region close to you (e.g. *Mumbai (ap-south-1)*) → create (free).
+2. Open the project → **Connect** (top bar) → copy both pooler URIs:
+   - **Transaction pooler** (port `6543`) → this becomes `DATABASE_URL` — append `?pgbouncer=true&connection_limit=1`
+   - **Session pooler** (port `5432`) → this becomes `DIRECT_URL`
+3. (Optional pure-Supabase alternative without Prisma lives in `supabase/` — not needed for this app.)
+
+### Step 2 — Push code to GitHub
+
+The repo owner is `SobhnathxLuffy`. Keep every secret out of git — only `.env.example` (placeholders) is tracked; the real `.env` is gitignored forever.
+
+### Step 3 — Vercel (hosting)
+
+1. [vercel.com](https://vercel.com) → sign in with GitHub → **Add New → Project** → import the repo (zero config; the build works as-is).
+2. **Settings → Environment Variables** — add exactly these four:
+
+   | Key | Value |
+   |---|---|
+   | `DATABASE_URL` | Supabase transaction-pooler URI (6543) `+ ?pgbouncer=true&connection_limit=1` |
+   | `DIRECT_URL` | Supabase session-pooler URI (5432) |
+   | `AUTH_SECRET` | `openssl rand -hex 32` (signs login sessions — keep it private) |
+   | `CRON_SECRET` | `openssl rand -hex 32` (protects `/api/cron`) |
+
+3. **Deploy** → you get `https://<your-app>.vercel.app`.
+
+### Step 4 — Create the tables (one-time)
+
+From your machine, against the **DIRECT_URL**:
+
+```bash
+cp prisma/schema.postgres.prisma prisma/schema.prisma   # swap SQLite → Postgres schema
+DATABASE_URL="<DIRECT_URL>" DIRECT_URL="<DIRECT_URL>" npx prisma db push
+```
+
+(Commit the swapped schema file — it's the production schema. Locally the SQLite dev schema stays in git history if you ever want it back.)
+
+### Step 5 — Scheduled jobs (optional but recommended)
+
+The scheduler already runs opportunistically every time either brother opens the app, so rollovers can never be skipped by more than "the first open of the day". For precise 00:01 IST midnight + Sunday 22:00 settlement even when nobody opens the app:
+
+- **cron-job.org (free, works on Vercel Hobby)** — new job → URL `https://<your-app>.vercel.app/api/cron` → every 5 minutes → add header `x-cron-secret: <your CRON_SECRET>`.
+- **Vercel Cron (Pro plan)** — add `"crons": [{ "path": "/api/cron", "schedule": "*/5 * * * *" }]` in `vercel.json`; Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically (the endpoint accepts both header styles).
+
+### Step 6 — Install on both phones
+
+Android Chrome → open the URL → **Install app** (PWA). Desktop (CachyOS): `brave --app=https://<your-app>.vercel.app` for a standalone window. Each brother logs in once; sessions last 30 days.
+
+### Where credentials live (and never live)
+
+- **Never in the code or git** — `.env` is gitignored; `.env.example` holds placeholders only.
+- **In Vercel** → encrypted env vars; in **Supabase** → the dashboard; on **phones** → nothing but the 30-day signed session.
+- PINs are stored **scrypt-hashed with per-player salt** — even a full database leak cannot reveal them. Sessions are HMAC-signed tokens; flipping one byte invalidates them.
+- If a secret ever leaks: rotate `AUTH_SECRET`/`CRON_SECRET` in Vercel (instant, everyone re-logs-in) and reset Supabase's DB password.
+
+> Same URL, two brothers, two PINs — that's the whole product. Player switching on a shared device is built in (amber button in the header).
 
 ## Map of the code
 

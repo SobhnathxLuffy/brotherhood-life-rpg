@@ -9,7 +9,9 @@ import { useQueryClient } from '@tanstack/react-query'
 import { apiPost, clearSession } from '@/components/game/live'
 import type { GameState } from '@/lib/types'
 
-export function SettingsDialog({ open, onOpenChange, state }: { open: boolean; onOpenChange: (v: boolean) => void; state: GameState }) {
+import { ArrowLeftRight } from 'lucide-react'
+
+export function SettingsDialog({ open, onOpenChange, state, onRequestSwitch }: { open: boolean; onOpenChange: (v: boolean) => void; state: GameState; onRequestSwitch?: () => void }) {
   const qc = useQueryClient()
   const [currentPin, setCurrentPin] = useState('')
   const [newPin, setNewPin] = useState('')
@@ -68,7 +70,10 @@ export function SettingsDialog({ open, onOpenChange, state }: { open: boolean; o
         </HudPanel>
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>Vault multiplier: <span className="num text-amber-300">{me.entMultiplier}x</span> · Level {me.level.level} {me.level.title}</span>
-          <ActionButton tone="crimson" size="sm" onClick={signOut}>Sign out</ActionButton>
+          <div className="flex gap-1.5">
+            {onRequestSwitch && <ActionButton tone="gold" size="sm" onClick={onRequestSwitch}><ArrowLeftRight className="mr-0.5 inline h-3 w-3" />Switch user</ActionButton>}
+            <ActionButton tone="crimson" size="sm" onClick={signOut}>Sign out</ActionButton>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

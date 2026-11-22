@@ -20,13 +20,19 @@ function safeSecretEqual(a: string, b: string): boolean {
 async function handle(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   // Secure by default in production: a deployment MUST set CRON_SECRET, and
-  // requests without the exact header are rejected. Dev (local single-user)
+  // requests without the exact secret are rejected. Dev (local single-user)
   // stays open so the brothers don't need to configure anything to play.
   if (!secret && process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Server misconfigured: CRON_SECRET not set' }, { status: 503 })
   }
+  // Accept the secret via EITHER header style:
+  //  - "x-cron-secret: <secret>"        → cron-job.org (custom header, every 5 min, free)
+  //  - "Authorization: Bearer <secret>" → Vercel Cron sends this automatically
+  const auth = req.headers.get('authorization') || ''
+  const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7).trim() : ''
+  const provided = req.headers.get('x-cron-secret') || bearer
   // timing-safe compare
-  if (secret && !safeSecretEqual(req.headers.get('x-cron-secret') || '', secret)) {
+  if (secret && !safeSecretEqual(provided, secret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {

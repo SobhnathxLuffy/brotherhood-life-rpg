@@ -64,3 +64,6 @@ tool-results/
 *.tsbuildinfo
 socket.log
 server.log
+
+# env template is safe to track (placeholders only)
+!.env.example

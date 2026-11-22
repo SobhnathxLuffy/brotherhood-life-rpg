@@ -3,12 +3,13 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled connection (Supabase: port 6543 ?pgbouncer=true&connection_limit=1)
+  directUrl = env("DIRECT_URL") // session/direct connection (Supabase: port 5432) — used by prisma db push / migrate
 }
 
-// For production (Vercel + Neon/Supabase Postgres): copy prisma/schema.postgres.prisma
-// over this file, set DATABASE_URL, then run `prisma db push`.
+// For production (Vercel + Supabase/Neon Postgres): copy this file over
+// prisma/schema.prisma, set DATABASE_URL + DIRECT_URL, run `npx prisma db push`.
 
 model Player {
   id                    String    @id // 'sobhnath' | 'umang'
