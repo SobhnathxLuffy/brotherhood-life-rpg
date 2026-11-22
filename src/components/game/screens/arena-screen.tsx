@@ -42,30 +42,30 @@ function TugOfWar({ sobhXp, umangXp }: { sobhXp: number; umangXp: number }) {
 
   return (
     <div>
-      <div className="relative flex h-9 w-full overflow-hidden rounded border border-border bg-black/50">
+      <div className="surface-sunken relative flex h-9 w-full overflow-hidden rounded-full">
         <motion.div
-          className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500/70 to-cyan-400/80"
+          className="absolute inset-y-0 left-0 rounded-r-full bg-gradient-to-r from-sobh/60 to-sobh/90"
           initial={{ width: '50%' }}
           animate={{ width: `${leftPct}%` }}
           transition={{ type: 'spring', stiffness: 70, damping: 18 }}
         />
         <motion.div
-          className="absolute inset-y-0 right-0 bg-gradient-to-l from-emerald-500/70 to-emerald-400/80"
+          className="absolute inset-y-0 right-0 rounded-l-full bg-gradient-to-l from-umang/60 to-umang/90"
           initial={{ width: '50%' }}
           animate={{ width: `${rightPct}%` }}
           transition={{ type: 'spring', stiffness: 70, damping: 18 }}
         />
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="rounded border border-border bg-black/85 px-2 py-0.5 text-[11px] font-bold tracking-[0.2em] text-white/90 hud-glow-gold">VS</span>
+          <span className="rounded-full border border-gold/50 bg-background/85 px-2.5 py-0.5 text-[11px] font-bold tracking-[0.2em] text-gold shadow-[0_0_14px_-2px_var(--glow-gold)] backdrop-blur-sm">VS</span>
         </div>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div className="text-left">
           <div className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" aria-hidden />
+            <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-sobh" aria-hidden />
             <span className={cn('hud-title', PLAYER_THEME.sobhnath.text)}>SOBHNATH</span>
           </div>
-          <p className={cn('num mt-1 text-3xl font-bold text-glow-cyan sm:text-4xl', PLAYER_THEME.sobhnath.text)}>
+          <p className={cn('num mt-1 font-display text-3xl font-black text-glow-cyan sm:text-4xl', PLAYER_THEME.sobhnath.text)}>
             {Math.max(0, sobhXp).toLocaleString('en-IN')}
             <span className="ml-1 text-xs font-medium text-muted-foreground">XP</span>
           </p>
@@ -73,9 +73,9 @@ function TugOfWar({ sobhXp, umangXp }: { sobhXp: number; umangXp: number }) {
         <div className="text-right">
           <div className="flex items-center justify-end gap-1.5">
             <span className={cn('hud-title', PLAYER_THEME.umang.text)}>UMANG</span>
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
+            <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-umang" aria-hidden />
           </div>
-          <p className={cn('num mt-1 text-3xl font-bold text-glow-emerald sm:text-4xl', PLAYER_THEME.umang.text)}>
+          <p className={cn('num mt-1 font-display text-3xl font-black text-glow-emerald sm:text-4xl', PLAYER_THEME.umang.text)}>
             {Math.max(0, umangXp).toLocaleString('en-IN')}
             <span className="ml-1 text-xs font-medium text-muted-foreground">XP</span>
           </p>
@@ -106,8 +106,8 @@ function StakeBanner({ state, onStakePaid, stakeBusy }: { state: GameState; onSt
         Weekly Stake
       </SectionTitle>
 
-      <p className="flex items-start gap-2 text-sm leading-relaxed text-amber-100/90">
-        <Scale className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden />
+      <p className="flex items-start gap-2 text-sm leading-relaxed text-foreground/85">
+        <Scale className="mt-0.5 h-4 w-4 shrink-0 text-gold" aria-hidden />
         <span>{STAKE_TEXT}</span>
       </p>
 
@@ -118,10 +118,10 @@ function StakeBanner({ state, onStakePaid, stakeBusy }: { state: GameState; onSt
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="mt-3 flex items-center gap-2 rounded border border-red-500/50 bg-red-500/10 px-3 py-2 hud-glow-crimson"
+            className="mt-3 flex items-center gap-2 rounded-lg border border-crimson/50 bg-crimson/10 px-3 py-2"
           >
-            <Skull className="h-4 w-4 shrink-0 text-red-400" aria-hidden />
-            <p className="text-sm font-bold uppercase tracking-wide text-red-300 text-glow-crimson">
+            <Skull className="h-4 w-4 shrink-0 text-crimson" aria-hidden />
+            <p className="text-sm font-bold uppercase tracking-wide text-crimson text-glow-crimson">
               {(state.players[week.pvpForfeitedBy as PId]?.displayName ?? week.pvpForfeitedBy).toUpperCase()} FORFEITED (KO or lockdown cheat)
             </p>
           </motion.div>
@@ -133,12 +133,12 @@ function StakeBanner({ state, onStakePaid, stakeBusy }: { state: GameState; onSt
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 200, damping: 18 }}
             className={cn(
-              'mt-3 flex items-center gap-2 rounded border px-3 py-2',
-              winner === 'sobhnath' ? 'border-cyan-400/50 bg-cyan-400/10 hud-glow-cyan' : 'border-emerald-400/50 bg-emerald-400/10 hud-glow-emerald',
+              'mt-3 flex items-center gap-2 rounded-lg border px-3 py-2',
+              winner === 'sobhnath' ? 'border-sobh/50 bg-sobh/10 hud-glow-cyan' : 'border-umang/50 bg-umang/10 hud-glow-emerald',
             )}
           >
-            <Trophy className={cn('h-5 w-5 shrink-0', winner === 'sobhnath' ? 'text-cyan-300' : 'text-emerald-300')} aria-hidden />
-            <p className={cn('text-lg font-black uppercase tracking-wider', winner === 'sobhnath' ? 'text-cyan-300 text-glow-cyan' : 'text-emerald-300 text-glow-emerald')}>
+            <Trophy className={cn('h-5 w-5 shrink-0', winner === 'sobhnath' ? 'text-sobh' : 'text-umang')} aria-hidden />
+            <p className={cn('font-display text-lg font-black uppercase tracking-wider', winner === 'sobhnath' ? 'text-sobh text-glow-cyan' : 'text-umang text-glow-emerald')}>
               {winner === 'sobhnath' ? 'SOBHNATH' : 'UMANG'} WINS THE WEEK
             </p>
           </motion.div>
@@ -148,10 +148,10 @@ function StakeBanner({ state, onStakePaid, stakeBusy }: { state: GameState; onSt
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="mt-3 flex items-center gap-2 rounded border border-amber-400/50 bg-amber-400/10 px-3 py-2 hud-glow-gold"
+            className="mt-3 flex items-center gap-2 rounded-lg border border-gold/50 bg-gold/10 px-3 py-2"
           >
-            <Scale className="h-4 w-4 shrink-0 text-amber-300" aria-hidden />
-            <p className="text-sm font-bold uppercase tracking-wide text-amber-300 text-glow-gold">DRAW — NOBODY PAYS THE STAKE</p>
+            <Scale className="h-4 w-4 shrink-0 text-gold" aria-hidden />
+            <p className="text-sm font-bold uppercase tracking-wide text-gold text-glow-gold">DRAW — NOBODY PAYS THE STAKE</p>
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -174,14 +174,14 @@ function KoStatus({ state }: { state: GameState }) {
   ]
   return (
     <HudPanel glow="crimson" className="p-4">
-      <SectionTitle right={<HeartPulse className="h-4 w-4 text-red-400" aria-hidden />}>Weekly HP — Knockout Watch</SectionTitle>
+      <SectionTitle right={<HeartPulse className="h-4 w-4 text-crimson" aria-hidden />}>Weekly HP — Knockout Watch</SectionTitle>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {brothers.map((b) => (
-          <div key={b.id} className="rounded border border-border bg-black/30 p-3">
+          <div key={b.id} className="surface-sunken rounded-lg p-3">
             <div className="mb-2 flex items-center justify-between">
               <span className={cn('hud-title', PLAYER_THEME[b.id].text)}>{PLAYER_THEME[b.id].name}</span>
               {b.ko ? (
-                <span className="num inline-flex items-center gap-1 rounded border border-red-500/60 bg-red-500/20 px-1.5 py-0.5 text-[11px] font-black tracking-widest text-red-300 lockdown-flash">
+                <span className="num inline-flex items-center gap-1 rounded-full border border-crimson/60 bg-crimson/15 px-2 py-0.5 text-[11px] font-black tracking-widest text-crimson lockdown-flash">
                   <Skull className="h-3 w-3" aria-hidden /> K.O.
                 </span>
               ) : (
@@ -193,9 +193,9 @@ function KoStatus({ state }: { state: GameState }) {
         ))}
       </div>
       <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
-        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden />
+        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" aria-hidden />
         <span>
-          Under <span className="num text-foreground">{WEEKLY.LOW_XP_THRESHOLD}</span> XP in a day costs <span className="num text-red-300">-{WEEKLY.LOW_XP_PENALTY} HP</span>.{' '}
+          Under <span className="num text-foreground">{WEEKLY.LOW_XP_THRESHOLD}</span> XP in a day costs <span className="num text-crimson">-{WEEKLY.LOW_XP_PENALTY} HP</span>.{' '}
           <span className="num text-foreground">0 HP</span> = Knocked Out = automatic PvP loss.
         </span>
       </p>
@@ -210,8 +210,8 @@ const LADDER = [
     title: 'CAUGHT',
     body: (
       <>
-        Cheater loses up to <span className="num text-red-300">30 XP</span> (floor <span className="num text-red-300">-{SNITCH.DAILY_XP_FLOOR}</span>), you gain{' '}
-        <span className="num text-emerald-300">+{SNITCH.REWARD_XP}</span>
+        Cheater loses up to <span className="num text-crimson">30 XP</span> (floor <span className="num text-crimson">-{SNITCH.DAILY_XP_FLOOR}</span>), you gain{' '}
+        <span className="num text-umang">+{SNITCH.REWARD_XP}</span>
       </>
     ),
   },
@@ -220,7 +220,7 @@ const LADDER = [
     body: (
       <>
         Already at <span className="num">-{SNITCH.DAILY_XP_FLOOR}</span> and cheats again → tomorrow: Entertainment Lockdown +{' '}
-        <span className="num text-amber-300">0.5x XP</span>
+        <span className="num text-gold">0.5x XP</span>
       </>
     ),
   },
@@ -228,7 +228,7 @@ const LADDER = [
     title: 'WEEK FORFEITED',
     body: (
       <>
-        Cheats ON lockdown day → weekly PvP forfeited + Boss heals <span className="num text-red-300">+140 HP</span>
+        Cheats ON lockdown day → weekly PvP forfeited + Boss heals <span className="num text-crimson">+140 HP</span>
       </>
     ),
   },
@@ -270,7 +270,7 @@ function SnitchTribunal({ state }: { state: GameState }) {
 
   return (
     <HudPanel glow="crimson" className="p-4">
-      <SectionTitle right={<Megaphone className="h-4 w-4 text-red-400" aria-hidden />}>Snitch Tribunal</SectionTitle>
+      <SectionTitle right={<Megaphone className="h-4 w-4 text-crimson" aria-hidden />}>Snitch Tribunal</SectionTitle>
 
       <p className="mb-3 text-xs leading-relaxed text-muted-foreground">Catch your brother cheating and the tribunal executes. Evidence optional — the system knows.</p>
 
@@ -291,19 +291,19 @@ function SnitchTribunal({ state }: { state: GameState }) {
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.05 }}
-                className="flex items-start gap-2.5 rounded border border-border bg-black/30 px-3 py-2"
+                className="flex items-start gap-2.5 rounded-lg border border-border bg-foreground/[0.03] px-3 py-2"
               >
-                <span className="num mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-red-500/50 bg-red-500/15 text-[11px] font-bold text-red-300">
+                <span className="num mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-crimson/50 bg-crimson/15 text-[11px] font-bold text-crimson">
                   {i + 1}
                 </span>
                 <div className="min-w-0">
-                  <p className="hud-title text-red-300/90">{step.title}</p>
+                  <p className="hud-title text-crimson/90">{step.title}</p>
                   <p className="mt-0.5 text-xs leading-relaxed text-foreground/90">{step.body}</p>
                 </div>
               </motion.div>
               {i < LADDER.length - 1 && (
                 <div className="flex justify-center py-1" aria-hidden>
-                  <ArrowDown className="h-3.5 w-3.5 text-red-400/70" />
+                  <ArrowDown className="h-3.5 w-3.5 text-crimson/70" />
                 </div>
               )}
             </div>
@@ -312,19 +312,19 @@ function SnitchTribunal({ state }: { state: GameState }) {
       </div>
 
       <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-        <span className="num text-emerald-300">+{SNITCH.REWARD_XP}</span> for you per catch; <span className="num">{SNITCH.COOLDOWN_MINUTES}</span>-min cooldown, max{' '}
+        <span className="num text-umang">+{SNITCH.REWARD_XP}</span> for you per catch; <span className="num">{SNITCH.COOLDOWN_MINUTES}</span>-min cooldown, max{' '}
         <span className="num">{SNITCH.MAX_PER_CATCHER_PER_DAY}</span>/day.
       </p>
 
       {/* Tribunal dialog */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="border-red-500/40 bg-card hud-glow-crimson sm:max-w-md">
+        <DialogContent className="ember-ring border-crimson/40 bg-card sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-sm uppercase tracking-[0.2em] text-red-300">
+            <DialogTitle className="flex items-center gap-2 font-display text-sm uppercase tracking-[0.2em] text-crimson">
               <Gavel className="h-4 w-4" aria-hidden /> Snitch Tribunal — Verdict
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
-              The accused loses up to <span className="num">30 XP</span>; you bank <span className="num text-emerald-300">+{SNITCH.REWARD_XP} XP</span> of entertainment
+              The accused loses up to <span className="num">30 XP</span>; you bank <span className="num text-umang">+{SNITCH.REWARD_XP} XP</span> of entertainment
               credit.
             </DialogDescription>
           </DialogHeader>
@@ -416,9 +416,9 @@ function RestShieldCard({ state }: { state: GameState }) {
     <HudPanel glow="cyan" className="flex flex-col p-4">
       <div className="mb-2 flex items-center justify-between">
         <span className="hud-title flex items-center gap-1.5">
-          <Shield className="h-3.5 w-3.5 text-cyan-300" aria-hidden /> Rest Shield
+          <Shield className="h-3.5 w-3.5 text-sobh" aria-hidden /> Rest Shield
         </span>
-        <span className="num rounded border border-cyan-400/40 bg-black/40 px-2 py-0.5 text-lg font-bold text-cyan-300 text-glow-cyan" aria-label={`${player.shieldsCount} shields held`}>
+        <span className="num rounded-full border border-sobh/40 bg-foreground/[0.04] px-2.5 py-0.5 text-lg font-bold text-sobh text-glow-cyan" aria-label={`${player.shieldsCount} shields held`}>
           ×{player.shieldsCount}
         </span>
       </div>
@@ -472,7 +472,7 @@ function OverrideCard({ state }: { state: GameState }) {
     <HudPanel glow="gold" className="flex flex-col p-4">
       <div className="mb-2 flex items-center justify-between">
         <span className="hud-title flex items-center gap-1.5">
-          <CalendarClock className="h-3.5 w-3.5 text-amber-300" aria-hidden /> Big-Event Override
+          <CalendarClock className="h-3.5 w-3.5 text-gold" aria-hidden /> Big-Event Override
         </span>
         {overrideActive ? (
           <StatChip label="" value="OVERRIDE ACTIVE TODAY" tone="gold" />
@@ -544,7 +544,7 @@ export function ArenaScreen({ state }: { state: GameState }) {
     <div className="space-y-4">
       <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
         <HudPanel className="p-4">
-          <SectionTitle right={<Swords className="h-4 w-4 text-amber-300" aria-hidden />}>Weekly PvP Head-to-Head</SectionTitle>
+          <SectionTitle right={<Swords className="h-4 w-4 text-gold" aria-hidden />}>Weekly PvP Head-to-Head</SectionTitle>
           <TugOfWar sobhXp={state.players.sobhnath.weeklyXp} umangXp={state.players.umang.weeklyXp} />
         </HudPanel>
       </motion.section>

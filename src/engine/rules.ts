@@ -49,6 +49,12 @@ export function calcQuestXP(log: { studyMode: StudyMode; studyQuestions: number;
 // ---------- Lockdown multiplier ----------
 export const LOCKDOWN_MULT = 0.5
 
+// ---------- Late quest lock ----------
+// Missed the 23:30 nightly lock? You may still write TODAY's quests late, but
+// everything logged that day pays a 20% XP toll. Stacks multiplicatively with
+// the lockdown multiplier (0.5 × 0.8 = 0.4).
+export const LATE_QUEST_MULT = 0.8
+
 // ---------- Entertainment economy ----------
 export function entMinutesEarned(effectiveXp: number, entMultiplier: number): number {
   return effectiveXp > 0 ? round2(effectiveXp * entMultiplier) : 0

@@ -1,4 +1,4 @@
-import { db } from '@/lib/db'
+import { db, ensurePostgresColumns } from '@/lib/db'
 import { emit } from '@/lib/emit'
 import { currentPlayerId, hashPin, verifyPin } from '@/lib/auth'
 import * as R from '@/engine/rules'
@@ -7,9 +7,18 @@ import type { GameState, PId, SocketEvent } from '@/lib/types'
 import type { DailyLog, Player, Week } from '@prisma/client'
 import { Prisma } from '@prisma/client'
 
+// Serverless instances are warm across requests — cache the heavy boot work in
+// module memory so a state poll doesn't re-pay it every 4 seconds.
+const JOBS_INTERVAL_MS = 60_000
+const REPAIR_INTERVAL_MS = 3_600_000
+let lastJobsRun = 0
+let lastRepairRun = 0
+let seedVerified = false
+
 // ============================ SEED & WEEK ============================
 
 export async function ensureSeed(now: Date = new Date()) {
+  await ensurePostgresColumns() // prod: self-upgrade the schema (no SQL Editor steps)
   const count = await db.player.count()
   if (count === 0) {
     await db.player.createMany({
@@ -27,7 +36,11 @@ export async function ensureSeed(now: Date = new Date()) {
       // already exists — fine
     }
   }
-  await repairLogWeeks()
+  // Legacy-row repair is idempotent but costs a full scan — throttle to hourly.
+  if (Date.now() - lastRepairRun > REPAIR_INTERVAL_MS) {
+    await repairLogWeeks()
+    lastRepairRun = Date.now()
+  }
 }
 
 /**
@@ -75,6 +88,49 @@ export async function weekOf(dateStr: string): Promise<Week | null> {
 
 // ============================ LOG HELPERS ============================
 
+// ---------- undo stack ----------
+
+interface UndoEntry {
+  /** numeric deltas that were applied (all positive when recorded) */
+  sq: number; sh: number; wm: number; sm: number
+  /** studyMode before a mode toggle (mode toggles are undone by restoring it) */
+  modeBefore?: string
+  /** entertainment minutes the vault credited for that action — refunded on undo */
+  credited: number
+  /** human label, e.g. "+10 questions" */
+  label: string
+  at: string
+}
+
+const UNDO_STACK_MAX = 10
+
+function parseUndoStack(json: string | null | undefined): UndoEntry[] {
+  try {
+    const v: unknown = JSON.parse(json || '[]')
+    if (!Array.isArray(v)) return []
+    return v.filter(isUndoEntry)
+  } catch {
+    return []
+  }
+}
+
+function isUndoEntry(v: unknown): v is UndoEntry {
+  if (typeof v !== 'object' || v === null) return false
+  const e = v as Record<string, unknown>
+  return typeof e.label === 'string' && typeof e.credited === 'number' && typeof e.at === 'string'
+}
+
+function pushUndoStack(json: string | null | undefined, entry: UndoEntry): string {
+  const stack = parseUndoStack(json)
+  stack.push(entry)
+  return JSON.stringify(stack.slice(-UNDO_STACK_MAX))
+}
+
+/** Combined XP multiplier for a day: lockdown (0.5) × late-lock toll (0.8). */
+function effectiveMult(log: Pick<DailyLog, 'xpMultiplier' | 'lateQuests'>): number {
+  return log.xpMultiplier * (log.lateQuests ? R.LATE_QUEST_MULT : 1)
+}
+
 export async function getOrCreateLog(playerId: string, dateStr: string, now: Date = new Date()): Promise<DailyLog> {
   // Derive the week from the LOG's own date (noon IST so mondayOf matches that
   // date) — never from `now`: callers pass tomorrow (quest lock, Tier-1 snitch
@@ -93,12 +149,14 @@ export async function getOrCreateLog(playerId: string, dateStr: string, now: Dat
 }
 
 export function toLogView(log: DailyLog) {
+  const stack = parseUndoStack(log.lastDeltaJson)
   return {
     logDate: log.logDate,
     studyQuestText: log.studyQuestText,
     workoutQuestText: log.workoutQuestText,
     skillQuestText: log.skillQuestText,
     questsLocked: !!log.questsLockedAt,
+    lateQuests: log.lateQuests,
     studyMode: log.studyMode as R.StudyMode,
     studyQuestions: log.studyQuestions,
     studyHours: log.studyHours,
@@ -112,26 +170,29 @@ export function toLogView(log: DailyLog) {
     overrideUsed: log.overrideUsed,
     overrideReason: log.overrideReason,
     bossHitApplied: log.bossHitApplied,
+    canUndo: stack.length > 0,
+    undoLabel: stack.length ? stack[stack.length - 1].label : null,
   }
 }
 
 /**
- * Recompute net_xp = questXp * multiplier + (snitch/boss ledger deltas for that date).
- * Pure + idempotent — safe to call after any mutation.
+ * Recompute net_xp = questXp × (lockdown × late-lock) multiplier + (snitch/boss ledger deltas for that date).
+ * Pure + idempotent — safe to call after any mutation. Pass `log` when the caller
+ * already holds a fresh copy to save a round trip.
  */
-export async function recomputeDaily(playerId: string, dateStr: string): Promise<DailyLog> {
-  const log = await getOrCreateLog(playerId, dateStr)
+export async function recomputeDaily(playerId: string, dateStr: string, log?: DailyLog): Promise<DailyLog> {
+  const l = log ?? (await getOrCreateLog(playerId, dateStr))
   const others = await db.ledger.aggregate({
     _sum: { deltaXp: true },
     where: { playerId, logDate: dateStr, eventType: { in: ['SNITCH_GAIN', 'SNITCH_LOSS', 'BOSS_LOOT'] } },
   })
-  const net = R.round2(log.questXp * log.xpMultiplier + (others._sum.deltaXp || 0))
-  return db.dailyLog.update({ where: { id: log.id }, data: { netXp: net } })
+  const net = R.round2(l.questXp * effectiveMult(l) + (others._sum.deltaXp || 0))
+  return db.dailyLog.update({ where: { id: l.id }, data: { netXp: net } })
 }
 
 /**
  * Add quest progress and recompute everything: XP, entertainment bank,
- * QUEST ledger row, co-op boss damage.
+ * QUEST ledger row, co-op boss damage, undo stack.
  */
 export async function applyQuestDelta(
   playerId: string,
@@ -157,24 +218,28 @@ export async function applyQuestDelta(
     workoutMins: next.workoutMins,
     skillMins: next.skillMins,
   })
-  const effectiveDelta = R.round2(newQuestXp * log.xpMultiplier - oldQuestXp * log.xpMultiplier)
+  const mult = effectiveMult(log)
+  const effectiveDelta = R.round2(newQuestXp * mult - oldQuestXp * mult)
 
-  await db.dailyLog.update({ where: { id: log.id }, data: { ...next, questXp: newQuestXp } })
+  // undo bookkeeping — record exactly what this action did so it can be reversed
+  const isModeToggle = !!delta.studyMode && delta.studyMode !== log.studyMode
+  let credited = 0
+  if (effectiveDelta > 0) credited = R.entMinutesEarned(effectiveDelta, player.entMultiplier)
+  const entry = makeUndoEntry(delta, isModeToggle ? log.studyMode : undefined, credited)
+
+  await db.dailyLog.update({ where: { id: log.id }, data: { ...next, questXp: newQuestXp, lastDeltaJson: pushUndoStack(log.lastDeltaJson, entry) } })
 
   // audit row (raw quest xp, pre-multiplier)
+  const note = `Quest XP (study ${next.studyMode === 'questions' ? next.studyQuestions + 'Q' : next.studyHours + 'h'} / workout ${next.workoutMins}m / skill ${next.skillMins}m)`
   const existing = await db.ledger.findFirst({ where: { playerId, logDate: dateStr, eventType: 'QUEST' } })
   if (existing) {
-    await db.ledger.update({ where: { id: existing.id }, data: { deltaXp: newQuestXp, note: `Quest XP (study ${next.studyMode === 'questions' ? next.studyQuestions + 'Q' : next.studyHours + 'h'} / workout ${next.workoutMins}m / skill ${next.skillMins}m)` } })
+    await db.ledger.update({ where: { id: existing.id }, data: { deltaXp: newQuestXp, note } })
   } else {
-    await db.ledger.create({ data: { playerId, logDate: dateStr, weekId: log.weekId, deltaXp: newQuestXp, eventType: 'QUEST', note: `Quest XP (study ${next.studyMode === 'questions' ? next.studyQuestions + 'Q' : next.studyHours + 'h'} / workout ${next.workoutMins}m / skill ${next.skillMins}m)` } })
+    await db.ledger.create({ data: { playerId, logDate: dateStr, weekId: log.weekId, deltaXp: newQuestXp, eventType: 'QUEST', note } })
   }
 
   // entertainment vault credit for positive gains
-  let credited = 0
-  if (effectiveDelta > 0) {
-    credited = R.entMinutesEarned(effectiveDelta, player.entMultiplier)
-    if (credited > 0) await db.player.update({ where: { id: playerId }, data: { entBankMins: { increment: credited } } })
-  }
+  if (credited > 0) await db.player.update({ where: { id: playerId }, data: { entBankMins: { increment: credited } } })
 
   await recomputeDaily(playerId, dateStr)
   await checkBossDamage(dateStr, now)
@@ -183,6 +248,85 @@ export async function applyQuestDelta(
     await emit({ kind: 'XP', playerId, amount: effectiveDelta, message: `${player.displayName} logged progress: ${effectiveDelta > 0 ? '+' : ''}${effectiveDelta} XP` })
   }
   return { questXp: newQuestXp, effectiveDelta, credited }
+}
+
+function makeUndoEntry(
+  delta: { studyQuestions?: number; studyHours?: number; workoutMins?: number; skillMins?: number; studyMode?: R.StudyMode },
+  modeBefore: string | undefined,
+  credited: number,
+): UndoEntry {
+  const parts: string[] = []
+  if (delta.studyQuestions) parts.push(`+${delta.studyQuestions} questions`)
+  if (delta.studyHours) parts.push(`+${delta.studyHours}h study`)
+  if (delta.workoutMins) parts.push(`+${delta.workoutMins}m workout`)
+  if (delta.skillMins) parts.push(`+${delta.skillMins}m skill`)
+  if (delta.studyMode && !modeBefore) parts.push(`mode → ${delta.studyMode}`)
+  return {
+    sq: delta.studyQuestions || 0,
+    sh: delta.studyHours || 0,
+    wm: delta.workoutMins || 0,
+    sm: delta.skillMins || 0,
+    modeBefore,
+    credited,
+    label: modeBefore ? `mode → ${delta.studyMode}` : parts.join(' + ') || 'unknown action',
+    at: new Date().toISOString(),
+  }
+}
+
+/**
+ * Reverse the most recent quest action: negates its numeric deltas, restores a
+ * toggled study mode, refunds the entertainment minutes that action credited
+ * (floored at the current balance — spent minutes are never clawed back into
+ * debt), and recomputes net XP. Boss hits already applied stay applied — the
+ * demon felt that blade.
+ */
+export async function undoLastDelta(playerId: string, dateStr: string, now: Date = new Date()) {
+  const [log, player] = await Promise.all([
+    getOrCreateLog(playerId, dateStr, now),
+    db.player.findUniqueOrThrow({ where: { id: playerId } }),
+  ])
+  const stack = parseUndoStack(log.lastDeltaJson)
+  const entry = stack.pop()
+  if (!entry) throw new GameError('Nothing to undo — no recent action to reverse.')
+
+  const restored: R.StudyMode | undefined =
+    entry.modeBefore === 'questions' || entry.modeBefore === 'hours' ? entry.modeBefore : undefined
+
+  const next = {
+    studyQuestions: Math.max(0, R.round2(log.studyQuestions - entry.sq)),
+    studyHours: Math.max(0, R.round2(log.studyHours - entry.sh)),
+    workoutMins: Math.max(0, log.workoutMins - entry.wm),
+    skillMins: Math.max(0, log.skillMins - entry.sm),
+    studyMode: restored || log.studyMode,
+    lastDeltaJson: JSON.stringify(stack),
+  }
+  const newQuestXp = R.calcQuestXP({
+    studyMode: next.studyMode as R.StudyMode,
+    studyQuestions: next.studyQuestions,
+    studyHours: next.studyHours,
+    workoutMins: next.workoutMins,
+    skillMins: next.skillMins,
+  })
+  await db.dailyLog.update({ where: { id: log.id }, data: { ...next, questXp: newQuestXp } })
+
+  // audit row mirrors the reverted totals
+  const note = `Quest XP (study ${next.studyMode === 'questions' ? next.studyQuestions + 'Q' : next.studyHours + 'h'} / workout ${next.workoutMins}m / skill ${next.skillMins}m) — undo`
+  const existing = await db.ledger.findFirst({ where: { playerId, logDate: dateStr, eventType: 'QUEST' } })
+  if (existing) {
+    await db.ledger.update({ where: { id: existing.id }, data: { deltaXp: newQuestXp, note } })
+  } else {
+    await db.ledger.create({ data: { playerId, logDate: dateStr, weekId: log.weekId, deltaXp: newQuestXp, eventType: 'QUEST', note } })
+  }
+
+  // refund the vault minutes that action credited — never below zero
+  if (entry.credited > 0) {
+    const clawBack = Math.min(entry.credited, Math.max(0, player.entBankMins))
+    if (clawBack > 0) await db.player.update({ where: { id: playerId }, data: { entBankMins: { decrement: clawBack } } })
+  }
+
+  const fresh = await recomputeDaily(playerId, dateStr)
+  await emit({ kind: 'XP', playerId, amount: R.round2(newQuestXp * effectiveMult(log) - log.questXp * effectiveMult(log)), message: `${player.displayName} undid: ${entry.label}` })
+  return { undone: entry.label, questXp: fresh.questXp, netXp: fresh.netXp }
 }
 
 /** Co-op boss: when BOTH brothers are at 70+ XP on the same day → -140 HP. */
@@ -485,12 +629,19 @@ export async function runDueJobs(now: Date = new Date()) {
   const jobs: string[] = []
   // Sweep backwards up to 10 days so multi-day downtime doesn't skip rollovers
   // forever. Oldest-first (chronological) so streak increments/resets land in
-  // the right order, and no early break: the per-date claim inside rollover()
-  // makes already-done / missing-week days a fast no-op (returns false).
-  const gameStart = (await db.appMeta.findUnique({ where: { key: 'game_start_date' } }))?.value || null
-  for (let i = 10; i >= 1; i--) {
-    const date = istDateOffset(-i, now)
-    if (gameStart && date < gameStart) continue // before first boot — not a played day
+  // the right order. Perf: read ALL claim keys in ONE query first — already-done
+  // days are skipped without the write attempt they used to cost (10 serverless
+  // round trips of P2002 rejections per state fetch was the lag).
+  const dates: string[] = []
+  for (let i = 10; i >= 1; i--) dates.push(istDateOffset(-i, now))
+  const [gameStart, claims] = await Promise.all([
+    db.appMeta.findUnique({ where: { key: 'game_start_date' } }),
+    db.appMeta.findMany({ where: { key: { in: dates.map((d) => `rollover:${d}`) } }, select: { key: true } }),
+  ])
+  const claimed = new Set(claims.map((c) => c.key))
+  for (const date of dates) {
+    if (gameStart && date < gameStart.value) continue // before first boot — not a played day
+    if (claimed.has(`rollover:${date}`)) continue // already claimed / done — pure skip, no write
     const ok = await rollover(date, now)
     if (ok) jobs.push(`rollover:${date}`)
   }
@@ -503,34 +654,50 @@ export async function runDueJobs(now: Date = new Date()) {
 // ============================ FULL STATE ============================
 
 export async function getFullState(now: Date = new Date(), req?: Request): Promise<GameState> {
-  await ensureSeed()
-  const jobs = await runDueJobs(now)
-  void jobs
+  // ensureSeed: on a warm instance skip the player.count round trip entirely
+  // (fresh-DB-while-warm only happens locally, and dev restarts constantly).
+  if (!seedVerified) {
+    await ensureSeed()
+    seedVerified = true
+  }
+  // runDueJobs sweeps rollover claims — throttled to once a minute per instance
+  // (the per-date claims make concurrent instances safe; the cron route covers
+  // quiet periods).
+  if (Date.now() - lastJobsRun > JOBS_INTERVAL_MS) {
+    await runDueJobs(now)
+    lastJobsRun = Date.now()
+  }
   const week = await ensureWeek(now)
   const today = istDateStr(now)
-  const players = await db.player.findMany()
-  const logsToday = await db.dailyLog.findMany({ where: { logDate: today } })
+  const p = istParts(now)
+  const me = await currentPlayerId(req)
+  // One round trip instead of eight sequential ones — this block used to chain
+  // ~10 awaits, which on serverless × Supabase latency was the visible lag.
+  const [players, logsToday, earnedTodayRows, weeklySums, totalSums, openSessions, feed, punishments] = await Promise.all([
+    db.player.findMany(),
+    db.dailyLog.findMany({ where: { logDate: today } }),
+    db.ledger.findMany({ where: { logDate: today, deltaXp: { gt: 0 } } }),
+    db.dailyLog.groupBy({ by: ['playerId'], _sum: { netXp: true }, where: { weekId: week.id } }),
+    db.dailyLog.groupBy({ by: ['playerId'], _sum: { netXp: true }, where: { playerId: { in: R.PLAYER_IDS } } }),
+    db.entSession.findMany({ where: { endedAt: null } }),
+    db.ledger.findMany({ orderBy: { createdAt: 'desc' }, take: 30 }),
+    db.punishment.findMany({ orderBy: { logDate: 'desc' }, take: 10 }),
+  ])
   // Rebuild exactly what the vault credited today, event by event:
   // QUEST rows are stored raw and were credited (delta × log.xpMultiplier
-  // [lockdown-aware]) × player.entMultiplier; SNITCH_GAIN / BOSS_LOOT rows
-  // were credited × player.entMultiplier. Negative rows never credit the vault.
-  const earnedTodayRows = await db.ledger.findMany({ where: { logDate: today, deltaXp: { gt: 0 } } })
+  // [lockdown-aware] × late-lock toll) × player.entMultiplier;
+  // SNITCH_GAIN / BOSS_LOOT rows were credited × player.entMultiplier.
+  // Negative rows never credit the vault.
   const earnedTodayMap = new Map<string, number>()
   for (const row of earnedTodayRows) {
     const pid = row.playerId as PId
     const playerMult = players.find((p) => p.id === pid)?.entMultiplier ?? 1
+    const log = logsToday.find((l) => l.playerId === pid)
     const mult = row.eventType === 'QUEST'
-      ? (logsToday.find((l) => l.playerId === pid)?.xpMultiplier ?? 1) * playerMult
+      ? (log ? log.xpMultiplier * (log.lateQuests ? R.LATE_QUEST_MULT : 1) : 1) * playerMult
       : playerMult
     earnedTodayMap.set(pid, R.round2((earnedTodayMap.get(pid) || 0) + row.deltaXp * mult))
   }
-  const weeklySums = await db.dailyLog.groupBy({ by: ['playerId'], _sum: { netXp: true }, where: { weekId: week.id } })
-  const totalSums = await db.dailyLog.groupBy({ by: ['playerId'], _sum: { netXp: true }, where: { playerId: { in: R.PLAYER_IDS } } })
-  const openSessions = await db.entSession.findMany({ where: { endedAt: null } })
-  const feed = await db.ledger.findMany({ orderBy: { createdAt: 'desc' }, take: 30 })
-  const punishments = await db.punishment.findMany({ orderBy: { logDate: 'desc' }, take: 10 })
-  const p = istParts(now)
-  const me = await currentPlayerId(req)
 
   const playerStates = Object.fromEntries(
     players.map((player) => {
@@ -554,9 +721,9 @@ export async function getFullState(now: Date = new Date(), req?: Request): Promi
             ? toLogView(log)
             : {
                 logDate: today, studyQuestText: null, workoutQuestText: null, skillQuestText: null, questsLocked: false,
-                studyMode: 'questions' as R.StudyMode, studyQuestions: 0, studyHours: 0, workoutMins: 0, skillMins: 0,
+                lateQuests: false, studyMode: 'questions' as R.StudyMode, studyQuestions: 0, studyHours: 0, workoutMins: 0, skillMins: 0,
                 questXp: 0, netXp: 0, xpMultiplier: 1, isLockdown: false, shieldUsed: false, overrideUsed: false,
-                overrideReason: null, bossHitApplied: false,
+                overrideReason: null, bossHitApplied: false, canUndo: false, undoLabel: null,
               },
           weeklyXp: R.round2(weeklyXp),
           totalXp: R.round2(totalXp),

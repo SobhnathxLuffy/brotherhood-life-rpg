@@ -81,11 +81,11 @@ function DebtForecast({ state }: { state: GameState }) {
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="flex items-center gap-2 rounded border border-emerald-400/50 bg-emerald-400/10 px-3 py-3 hud-glow-emerald"
+          className="flex items-center gap-2 rounded-lg border border-umang/50 bg-umang/10 px-3 py-3"
         >
-          <ShieldCheck className="h-5 w-5 shrink-0 text-emerald-300" aria-hidden />
+          <ShieldCheck className="h-5 w-5 shrink-0 text-umang" aria-hidden />
           <div>
-            <p className="text-sm font-bold uppercase tracking-wide text-emerald-300 text-glow-emerald">
+            <p className="text-sm font-bold uppercase tracking-wide text-umang text-glow-emerald">
               Protected today — R = 0
             </p>
             <p className="text-[11px] text-muted-foreground">
@@ -97,11 +97,11 @@ function DebtForecast({ state }: { state: GameState }) {
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="flex items-center gap-2 rounded border border-amber-400/50 bg-amber-400/10 px-3 py-3 hud-glow-gold"
+          className="flex items-center gap-2 rounded-lg border border-gold/50 bg-gold/10 px-3 py-3"
         >
-          <Sparkles className="h-5 w-5 shrink-0 text-amber-300" aria-hidden />
+          <Sparkles className="h-5 w-5 shrink-0 text-gold" aria-hidden />
           <div>
-            <p className="text-base font-black uppercase tracking-widest text-amber-300 text-glow-gold">Debt clear</p>
+            <p className="font-display text-base font-black uppercase tracking-widest text-gold text-glow-gold">Debt clear</p>
             <p className="text-[11px] text-muted-foreground">The chamber is silent. Keep the streak alive.</p>
           </div>
         </motion.div>
@@ -109,15 +109,15 @@ function DebtForecast({ state }: { state: GameState }) {
         <>
           <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
             Today&apos;s net XP <span className="num text-foreground">{log.netXp}</span> leaves a live debt of{' '}
-            <span className="num font-bold text-red-300 text-glow-crimson">{R} XP</span> — reps update in real time as you log.
+            <span className="num font-bold text-crimson text-glow-crimson">{R} XP</span> — reps update in real time as you log.
           </p>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {REP_CARDS.map((c) => (
-              <div key={c.key} className="flex flex-col items-center rounded border border-red-500/30 bg-black/40 px-2 py-3 text-center">
-                <span className="hud-title flex items-center gap-1 text-red-300/80">
+              <div key={c.key} className="flex flex-col items-center rounded-lg border border-crimson/30 bg-crimson/[0.06] px-2 py-3 text-center">
+                <span className="hud-title flex items-center gap-1 text-crimson/80">
                   <c.icon className="h-3.5 w-3.5" aria-hidden /> {c.name}
                 </span>
-                <SpringNum value={reps[c.key]} className="mt-1.5 text-3xl font-bold text-red-200 text-glow-crimson sm:text-4xl" />
+                <SpringNum value={reps[c.key]} className="mt-1.5 font-display text-3xl font-black text-crimson text-glow-crimson sm:text-4xl" />
                 <span className="mt-1 text-[11px] text-muted-foreground">
                   <span className="num">{c.weightKg}</span> kg · <span className="num">{c.mult}</span> per XP
                 </span>
@@ -127,7 +127,7 @@ function DebtForecast({ state }: { state: GameState }) {
         </>
       )}
 
-      <p className="mt-3 text-center text-sm font-semibold tracking-wide text-amber-200/90">
+      <p className="mt-3 text-center text-sm font-semibold tracking-wide text-gold">
         Every JEE question you log shrinks the debt.
       </p>
     </HudPanel>
@@ -159,16 +159,16 @@ function PendingTicket({ ticket, isUmang, isSobhnath }: { ticket: PunishmentView
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded border border-red-500/40 bg-black/40 p-3 hud-glow-crimson"
+      className="rounded-lg border border-crimson/40 bg-crimson/[0.06] p-3"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-          <ScrollText className="h-4 w-4 text-red-400" aria-hidden />
+          <ScrollText className="h-4 w-4 text-crimson" aria-hidden />
           Punishment Ticket — <span className="num">{ticket.logDate}</span>
         </span>
         <span className="inline-flex items-center gap-2">
           <StatChip label="debt" value={ticket.remainingXp} tone="crimson" />
-          <span className="rounded border border-red-500/60 bg-red-500/20 px-1.5 py-0.5 text-[11px] font-black tracking-widest text-red-300 num lockdown-flash">
+          <span className="rounded-full border border-crimson/60 bg-crimson/15 px-2 py-0.5 text-[11px] font-black tracking-widest text-crimson num lockdown-flash">
             PENDING
           </span>
         </span>
@@ -184,17 +184,17 @@ function PendingTicket({ ticket, isUmang, isSobhnath }: { ticket: PunishmentView
             { label: 'SQT', value: ticket.squats },
           ] as const
         ).map((r) => (
-          <div key={r.label} className="rounded border border-border bg-black/50 px-1 py-1.5">
+          <div key={r.label} className="surface-sunken rounded-md px-1 py-1.5">
             <p className="hud-title">{r.label}</p>
-            <p className="num mt-0.5 text-lg font-bold text-red-200">{fmtRep(r.value)}</p>
+            <p className="num mt-0.5 text-lg font-bold text-crimson">{fmtRep(r.value)}</p>
           </div>
         ))}
       </div>
 
       {/* Verification gate */}
       {isUmang ? (
-        <div className="mt-3 rounded border border-emerald-400/30 bg-emerald-400/5 p-2.5">
-          <p className="text-[11px] leading-relaxed text-emerald-200/80">
+        <div className="mt-3 rounded-lg border border-umang/30 bg-umang/[0.06] p-2.5">
+          <p className="text-[11px] leading-relaxed text-umang/90">
             Verify only AFTER watching his sets live — your PIN signs off his sweat.
           </p>
           <div className="mt-2 flex gap-2">
@@ -242,8 +242,8 @@ function PendingQueue({ state }: { state: GameState }) {
       </SectionTitle>
 
       {pending.length === 0 ? (
-        <div className="flex items-center justify-center gap-2 rounded border border-border bg-black/30 px-3 py-6 text-sm text-muted-foreground">
-          <CheckCircle2 className="h-4 w-4 text-emerald-400" aria-hidden />
+        <div className="surface-sunken flex items-center justify-center gap-2 rounded-lg px-3 py-6 text-sm text-muted-foreground">
+          <CheckCircle2 className="h-4 w-4 text-umang" aria-hidden />
           No pending tickets — the chamber rests until midnight.
         </div>
       ) : (
@@ -271,15 +271,15 @@ function CompletedHistory({ state }: { state: GameState }) {
       </SectionTitle>
 
       {done.length === 0 ? (
-        <p className="rounded border border-border bg-black/30 px-3 py-4 text-center text-sm text-muted-foreground">
+        <p className="surface-sunken rounded-lg px-3 py-4 text-center text-sm text-muted-foreground">
           Nothing verified yet — history stays empty until sweat is signed off.
         </p>
       ) : (
         <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
           {done.map((t) => (
-            <div key={t.id} className="flex items-center justify-between gap-2 rounded border border-emerald-400/30 bg-emerald-400/5 px-3 py-2">
+            <div key={t.id} className="flex items-center justify-between gap-2 rounded-lg border border-umang/30 bg-umang/[0.06] px-3 py-2">
               <span className="flex min-w-0 items-center gap-1.5 text-xs text-foreground/90">
-                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" aria-hidden />
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-umang" aria-hidden />
                 <span className="truncate">
                   Ticket — <span className="num">{t.logDate}</span>
                   <span className="ml-2 hidden text-muted-foreground sm:inline num">
@@ -288,7 +288,7 @@ function CompletedHistory({ state }: { state: GameState }) {
                 </span>
               </span>
               <span className="shrink-0 text-[11px] text-muted-foreground">
-                verified <span className="num text-emerald-300">{t.verifiedAt ? t.verifiedAt.slice(0, 10) : '—'}</span>
+                verified <span className="num text-umang">{t.verifiedAt ? t.verifiedAt.slice(0, 10) : '—'}</span>
               </span>
             </div>
           ))}

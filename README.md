@@ -15,6 +15,10 @@ Built on the plan's exact math (kept 100% deterministic in one immutable file), 
 
 - **Quests (100 XP base, half-rate overtime)** — Study 60 (2 XP/Q to 30Q, then 1 XP; or 15 XP/h to 4h, then 7.5), Workout 25 (unlocks at 30+ min, +6.25 per extra 15m), Skill 15 (5 XP per 15m to 45m, then 2.5). Lockdown days multiply everything by 0.5.
 - **Quest lock** — write tomorrow's 3 quests before **23:30 IST** (the app nag-pops 22:30–23:30). Locked quests are read-only the next day.
+- **Late rescue** — missed the nightly lock? Write **today's** quests late (any time today) and salvage the day: everything logged that day earns **×0.8 XP** (stacks with lockdown → ×0.4).
+- **Undo station** — misclicked a `+` button? The Quests screen's Undo reverses the latest action: XP, entertainment-vault credit and the ledger all snap back (stack of 10).
+- **Brother's quests** — once a brother locks his quests, the other can read them (Quests screen). Before the lock they stay sealed — no peeking.
+- **Light & dark** — full dual-theme "warm ember" redesign (Claude-style peach palette), toggle in the header, system default supported.
 - **Entertainment economy** — 1 XP = 1 min (Sobhnath) / 2 min (Umang), credited straight to the vault. Spend presets or the **live drain stopwatch** (both brothers see who's watching — snitch bait). Lockdown hard-disables it (UI + server).
 - **Co-op Boss** — 700 HP weekly spawn (random name + level). Both brothers ≥70 XP the same day → **-140 HP**. Kill → **+70 XP loot each** (+70m/+140m vault).
 - **Weekly PvP** — 100 HP Monday; under 50 XP in a day costs **-25 HP**; 0 HP = KO = forfeit. Sunday **22:00 IST** settlement vs the stake (₹50 treat or 2-day chore) with Mark-Stake-Paid.

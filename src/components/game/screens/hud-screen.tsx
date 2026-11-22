@@ -50,17 +50,17 @@ function relTime(createdAt: string): string {
 }
 
 const FEED_ICONS: Record<string, { icon: LucideIcon; cls: string }> = {
-  QUEST: { icon: Swords, cls: 'text-cyan-300' },
-  SNITCH_GAIN: { icon: Megaphone, cls: 'text-amber-300' },
-  SNITCH_LOSS: { icon: AlertTriangle, cls: 'text-red-400' },
-  BOSS_LOOT: { icon: Crown, cls: 'text-amber-300' },
-  JEE_IMPORT: { icon: FileUp, cls: 'text-fuchsia-300' },
+  QUEST: { icon: Swords, cls: 'text-primary' },
+  SNITCH_GAIN: { icon: Megaphone, cls: 'text-gold' },
+  SNITCH_LOSS: { icon: AlertTriangle, cls: 'text-crimson' },
+  BOSS_LOOT: { icon: Crown, cls: 'text-gold' },
+  JEE_IMPORT: { icon: FileUp, cls: 'text-sobh' },
 }
 const FEED_ICON_FALLBACK = { icon: Swords, cls: 'text-muted-foreground' }
 
 function feedPlayerColor(playerId: string): string {
-  if (playerId === 'sobhnath') return 'text-cyan-300'
-  if (playerId === 'umang') return 'text-emerald-300'
+  if (playerId === 'sobhnath') return 'text-sobh'
+  if (playerId === 'umang') return 'text-umang'
   return 'text-muted-foreground'
 }
 
@@ -72,28 +72,36 @@ function PlayerCard({ pid, state, index }: { pid: PId; state: GameState; index: 
   const hp = pid === 'sobhnath' ? state.week.sobhnathHp : state.week.umangHp
   const ko = pid === 'sobhnath' ? state.week.sobhnathKo : state.week.umangKo
   const glowText = pid === 'sobhnath' ? 'text-glow-cyan' : 'text-glow-emerald'
+  const isSobh = pid === 'sobhnath'
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.05 * index, duration: 0.35, ease: 'easeOut' }}
+      transition={{ delay: 0.05 * index, duration: 0.3, ease: 'easeOut' }}
       whileHover={{ y: -2 }}
       className="relative"
     >
-      <HudPanel className="h-full p-3 sm:p-4">
+      <HudPanel className="relative h-full overflow-hidden p-3 sm:p-4">
+        {/* identity tint + top accent strip — fighting-game character card */}
+        <div className={cn('pointer-events-none absolute inset-0', isSobh ? 'bg-sobh/[0.05]' : 'bg-umang/[0.05]')} aria-hidden />
+        <div
+          className={cn('pointer-events-none absolute inset-x-0 top-0 h-[3px]', isSobh ? 'bg-gradient-to-r from-sobh via-sobh/50 to-transparent' : 'bg-gradient-to-r from-umang via-umang/50 to-transparent')}
+          aria-hidden
+        />
+
         {/* name + level chip */}
-        <div className="flex items-center justify-between gap-1.5">
-          <span className={cn('truncate text-sm font-black uppercase tracking-[0.15em]', theme.text, glowText)}>
+        <div className="relative flex items-center justify-between gap-1.5">
+          <span className={cn('truncate font-display text-sm font-extrabold uppercase tracking-[0.15em]', theme.text, glowText)}>
             {p.displayName}
           </span>
-          <span className="num shrink-0 rounded border border-border bg-black/40 px-1.5 py-0.5 text-[9px] text-muted-foreground">
+          <span className="num shrink-0 rounded-full border border-gold/45 bg-gold/10 px-2 py-0.5 text-[9px] font-semibold text-gold">
             Lv.{p.level.level} {p.level.title}
           </span>
         </div>
 
         {/* weekly HP */}
-        <div className="mt-2">
+        <div className="relative mt-2">
           <span className="hud-title">Weekly HP</span>
           <GameBar
             className="mt-1"
@@ -105,10 +113,10 @@ function PlayerCard({ pid, state, index }: { pid: PId; state: GameState; index: 
         </div>
 
         {/* today's XP */}
-        <div className="mt-2 flex items-center justify-between gap-1">
+        <div className="relative mt-2 flex items-center justify-between gap-1">
           <span className="hud-title">Today XP</span>
           {p.todayLog.isLockdown && (
-            <span className="lockdown-flash rounded border border-red-400/50 bg-red-500/10 px-1 py-0.5 text-[8px] font-black tracking-wider text-red-300 hud-glow-crimson">
+            <span className="lockdown-flash rounded-full border border-crimson/50 bg-crimson/10 px-1.5 py-0.5 text-[8px] font-black tracking-wider text-crimson">
               LOCKDOWN 0.5x
             </span>
           )}
@@ -122,7 +130,7 @@ function PlayerCard({ pid, state, index }: { pid: PId; state: GameState; index: 
         />
 
         {/* stat chips */}
-        <div className="mt-2 flex flex-wrap gap-1">
+        <div className="relative mt-2 flex flex-wrap gap-1">
           <StatChip
             icon={<Flame className="h-3 w-3" />}
             label="TO SHIELD"
@@ -136,13 +144,10 @@ function PlayerCard({ pid, state, index }: { pid: PId; state: GameState; index: 
         {/* watching badge */}
         {p.watching && (
           <div
-            className="mt-2 flex items-center gap-1.5 rounded border border-red-400/40 bg-red-500/10 px-2 py-1 text-[9px] font-black tracking-[0.2em] text-red-300 hud-glow-crimson"
+            className="relative mt-2 flex items-center gap-1.5 rounded-lg border border-crimson/40 bg-crimson/10 px-2 py-1 text-[9px] font-black tracking-[0.2em] text-crimson"
             title="The other brother can snitch!"
           >
-            <span className="relative flex h-2 w-2 shrink-0">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-            </span>
+            <span className="pulse-dot relative flex h-2 w-2 shrink-0 rounded-full bg-crimson" />
             WATCHING NOW
           </div>
         )}
@@ -150,12 +155,12 @@ function PlayerCard({ pid, state, index }: { pid: PId; state: GameState; index: 
 
       {/* KO overlay */}
       {ko && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-black/75">
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/80 backdrop-blur-[2px]">
           <motion.div
             initial={{ scale: 1.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 14 }}
-            className="-rotate-6 rounded border-2 border-red-500/80 bg-black/70 px-3 py-1.5 text-center text-xs font-black tracking-[0.25em] text-red-400 text-glow-crimson sm:text-sm"
+            className="-rotate-6 rounded-lg border-2 border-crimson/80 bg-crimson/15 px-3 py-1.5 text-center font-display text-xs font-black tracking-[0.25em] text-crimson text-glow-crimson sm:text-sm"
           >
             KNOCKED OUT
           </motion.div>
@@ -245,14 +250,14 @@ function BossLamp({ label, lit }: { label: string; lit: boolean }) {
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold tracking-wider num',
         lit
-          ? 'border-amber-400/60 bg-amber-400/10 text-amber-300 hud-glow-gold'
-          : 'border-border bg-black/40 text-muted-foreground'
+          ? 'border-gold/60 bg-gold/10 text-gold hud-glow-gold'
+          : 'border-border bg-foreground/[0.04] text-muted-foreground'
       )}
     >
       <span
         className={cn(
           'h-1.5 w-1.5 rounded-full',
-          lit ? 'bg-amber-300 shadow-[0_0_6px_rgba(251,191,36,0.9)]' : 'bg-muted-foreground/40'
+          lit ? 'pulse-dot bg-gold shadow-[0_0_6px_rgba(212,175,55,0.9)]' : 'bg-muted-foreground/40'
         )}
       />
       {`[${label} >= ${BOSS.TRIGGER_XP} XP]`}
@@ -264,7 +269,7 @@ function BossLamp({ label, lit }: { label: string; lit: boolean }) {
 
 function DeadlineChip({ icon: Icon, iconCls, label, mins }: { icon: LucideIcon; iconCls: string; label: string; mins: number }) {
   return (
-    <div className="hud-panel flex items-center gap-2 rounded-md px-2.5 py-2">
+    <div className="hud-panel flex items-center gap-2 rounded-lg px-2.5 py-2">
       <Icon className={cn('h-4 w-4 shrink-0', iconCls)} />
       <div className="flex min-w-0 flex-col">
         <span className="hud-title truncate">{label}</span>
@@ -290,14 +295,14 @@ function FeedRow({ entry }: { entry: FeedEntry }) {
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className="flex items-center gap-2 border-b border-border/50 py-2 last:border-b-0"
     >
-      <span className={cn('flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-black/40', ic.cls)}>
+      <span className={cn('surface-sunken flex h-6 w-6 shrink-0 items-center justify-center rounded-full', ic.cls)}>
         <Icon className="h-3.5 w-3.5" />
       </span>
       <span className={cn('shrink-0 text-[11px] font-black tracking-wider uppercase', feedPlayerColor(entry.playerId))}>
         {name}
       </span>
       <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{entry.note ?? '—'}</span>
-      <span className={cn('num shrink-0 text-xs font-bold', entry.deltaXp >= 0 ? 'text-emerald-400' : 'text-red-400')}>
+      <span className={cn('num shrink-0 text-xs font-bold', entry.deltaXp >= 0 ? 'text-umang' : 'text-crimson')}>
         {fmtDelta(entry.deltaXp)}
       </span>
       <span className="num w-14 shrink-0 text-right text-[10px] text-muted-foreground">{relTime(entry.createdAt)}</span>
@@ -326,12 +331,14 @@ export function HudScreen({ state }: { state: GameState }) {
       {/* 2. SHARED CO-OP BOSS ARENA */}
       <motion.section
         aria-label="Shared co-op boss arena"
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.35, ease: 'easeOut' }}
+        transition={{ delay: 0.1, duration: 0.3, ease: 'easeOut' }}
       >
         <HudPanel glow="crimson" className="relative overflow-hidden">
-          <div className="scanline pointer-events-none absolute inset-0" aria-hidden="true" />
+          <div className="boss-aura pointer-events-none absolute inset-0" aria-hidden />
+          <div className="scanline pointer-events-none absolute inset-0" aria-hidden />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-transparent via-crimson/70 to-transparent" aria-hidden />
           <SectionTitle
             right={<span className="num text-[10px] text-muted-foreground">WEEK {week.id}</span>}
           >
@@ -357,34 +364,47 @@ export function HudScreen({ state }: { state: GameState }) {
                 transition={{ type: 'spring', stiffness: 180, damping: 15 }}
                 className="absolute inset-0 flex items-center justify-center"
               >
-                <span className="rounded border-2 border-red-500/80 bg-black/70 px-4 py-1.5 text-xl font-black tracking-[0.4em] text-red-400 text-glow-crimson">
+                <span className="rounded-lg border-2 border-crimson/80 bg-crimson/15 px-4 py-1.5 font-display text-xl font-black tracking-[0.4em] text-crimson text-glow-crimson">
                   SLAIN
                 </span>
               </motion.div>
             )}
           </div>
 
-          {/* boss name + HP bar */}
-          <div className="text-center text-base font-black uppercase tracking-[0.2em] text-red-300 text-glow-crimson sm:text-lg">
+          {/* boss name + HP bar (flash overlay fires on every HP change) */}
+          <div className="relative text-center font-display text-base font-extrabold uppercase tracking-[0.2em] text-crimson text-glow-crimson sm:text-lg">
             {week.bossName}
           </div>
-          <GameBar
-            className="mt-2"
-            value={week.bossCurrentHp}
-            max={week.bossMaxHp}
-            tone="crimson"
-            label={`${week.bossCurrentHp} / ${week.bossMaxHp} HP`}
-          />
+          <div className="relative">
+            <AnimatePresence initial={false}>
+              <motion.div
+                key={week.bossCurrentHp}
+                className="pointer-events-none absolute inset-0 rounded-full bg-crimson/25"
+                initial={{ opacity: 0.7 }}
+                animate={{ opacity: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.45 }}
+                aria-hidden
+              />
+            </AnimatePresence>
+            <GameBar
+              className="mt-2"
+              value={week.bossCurrentHp}
+              max={week.bossMaxHp}
+              tone="crimson"
+              label={`${week.bossCurrentHp} / ${week.bossMaxHp} HP`}
+            />
+          </div>
 
           {week.bossDefeated ? (
-            <div className="mt-3 flex items-center justify-center gap-2 rounded border border-amber-400/50 bg-amber-400/10 px-3 py-2 text-[11px] font-black tracking-widest text-amber-300 hud-glow-gold">
+            <div className="relative mt-3 flex items-center justify-center gap-2 rounded-lg border border-gold/50 bg-gold/10 px-3 py-2 text-[11px] font-black tracking-widest text-gold hud-glow-gold">
               <Crown className="h-4 w-4 shrink-0" />
               <span className="num">BOSS LOOT +{BOSS.LOOT_XP} XP PAID TO BOTH</span>
             </div>
           ) : (
             <>
               {/* trigger lamps */}
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <div className="relative mt-3 flex flex-wrap items-center justify-center gap-2">
                 <BossLamp label={PLAYER_THEME.sobhnath.name} lit={players.sobhnath.todayLog.netXp >= BOSS.TRIGGER_XP} />
                 <BossLamp label={PLAYER_THEME.umang.name} lit={players.umang.todayLog.netXp >= BOSS.TRIGGER_XP} />
               </div>
@@ -393,15 +413,15 @@ export function HudScreen({ state }: { state: GameState }) {
                 <motion.div
                   animate={{ opacity: [0.55, 1, 0.55], scale: [1, 1.04, 1] }}
                   transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                  className="num mt-2 text-center text-[11px] font-black tracking-[0.2em] text-amber-300 text-glow-gold"
+                  className="num relative mt-2 text-center text-[11px] font-black tracking-[0.2em] text-gold text-glow-gold"
                 >
                   SYNERGY CHARGED — NEXT DOUBLE-DAY DEALS -{BOSS.HIT_DMG}
                 </motion.div>
               )}
 
               {bothHit && (
-                <div className="mt-2 flex justify-center">
-                  <span className="inline-flex items-center gap-1.5 rounded border border-red-400/50 bg-red-500/10 px-2 py-1 text-[10px] font-bold tracking-widest text-red-300 num">
+                <div className="relative mt-2 flex justify-center">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-crimson/50 bg-crimson/10 px-2 py-1 text-[10px] font-bold tracking-widest text-crimson num">
                     <Skull className="h-3 w-3 shrink-0" />
                     TODAY&apos;S HIT DELIVERED: -{BOSS.HIT_DMG}
                   </span>
@@ -415,24 +435,24 @@ export function HudScreen({ state }: { state: GameState }) {
       {/* 3. DEADLINES STRIP */}
       <motion.section
         aria-label="Deadlines"
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15, duration: 0.35, ease: 'easeOut' }}
+        transition={{ delay: 0.15, duration: 0.3, ease: 'easeOut' }}
       >
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <DeadlineChip icon={Swords} iconCls="text-cyan-300" label="Quests lock in" mins={deadlines.questLockMins} />
-          <DeadlineChip icon={Hourglass} iconCls="text-amber-300" label="Override closes in" mins={deadlines.overrideCutoffMins} />
-          <DeadlineChip icon={Skull} iconCls="text-red-400" label="PvP ends in" mins={deadlines.pvpEndMins} />
-          <DeadlineChip icon={CalendarClock} iconCls="text-amber-300" label="New week in" mins={deadlines.newWeekMins} />
+          <DeadlineChip icon={Swords} iconCls="text-primary" label="Quests lock in" mins={deadlines.questLockMins} />
+          <DeadlineChip icon={Hourglass} iconCls="text-gold" label="Override closes in" mins={deadlines.overrideCutoffMins} />
+          <DeadlineChip icon={Skull} iconCls="text-crimson" label="PvP ends in" mins={deadlines.pvpEndMins} />
+          <DeadlineChip icon={CalendarClock} iconCls="text-gold" label="New week in" mins={deadlines.newWeekMins} />
         </div>
       </motion.section>
 
       {/* 4. LIVE COMBAT FEED */}
       <motion.section
         aria-label="Live combat feed"
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.35, ease: 'easeOut' }}
+        transition={{ delay: 0.2, duration: 0.3, ease: 'easeOut' }}
       >
         <HudPanel>
           <SectionTitle

@@ -49,13 +49,39 @@ function serverlessSafeUrl(url: string | undefined): string | undefined {
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
+  schemaReady?: Promise<void>
 }
 
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
     datasources: { db: { url: serverlessSafeUrl(process.env.DATABASE_URL) } },
-    log: ['query'],
+    // query logging costs real time on serverless — keep it for local dev only
+    log: process.env.NODE_ENV === 'production' ? ['error', 'warn'] : ['query'],
   })
+
+/**
+ * Runtime auto-migration for Postgres (Supabase prod): idempotently add the
+ * columns shipped after the initial DDL, so an existing deployment upgrades
+ * itself on first request — zero SQL Editor steps for the user.
+ * Runs at most once per serverless instance (the promise is cached globally).
+ */
+export function ensurePostgresColumns(): Promise<void> {
+  if (!globalForPrisma.schemaReady) {
+    globalForPrisma.schemaReady = (async () => {
+      if (!/^postgres(ql)?:\/\//i.test(process.env.DATABASE_URL || '')) return // local SQLite — prisma db push handles it
+      try {
+        await db.$executeRawUnsafe(
+          `ALTER TABLE "DailyLog" ADD COLUMN IF NOT EXISTS "lateQuests" BOOLEAN NOT NULL DEFAULT false,
+           ADD COLUMN IF NOT EXISTS "lastDeltaJson" TEXT`,
+        )
+      } catch (err) {
+        console.error('[db] auto-migration failed (will retry next instance):', err instanceof Error ? err.message : err)
+        globalForPrisma.schemaReady = undefined // allow retry on next call
+      }
+    })()
+  }
+  return globalForPrisma.schemaReady
+}
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db

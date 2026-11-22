@@ -8,6 +8,8 @@ export interface DailyLogView {
   workoutQuestText: string | null
   skillQuestText: string | null
   questsLocked: boolean
+  /** quests locked late (missed nightly window) — the whole day pays 0.8x XP */
+  lateQuests: boolean
   studyMode: StudyMode
   studyQuestions: number
   studyHours: number
@@ -21,6 +23,10 @@ export interface DailyLogView {
   overrideUsed: boolean
   overrideReason: string | null
   bossHitApplied: boolean
+  /** undo stack is non-empty — a misclick can be reversed */
+  canUndo: boolean
+  /** human label of the most recent undoable action, e.g. "+10 questions" */
+  undoLabel: string | null
 }
 
 export interface PlayerState {

@@ -59,6 +59,8 @@ model DailyLog {
   workoutMins      Int       @default(0)
   skillMins        Int       @default(0)
   xpMultiplier     Float     @default(1.0) // 0.5 on lockdown days
+  lateQuests       Boolean   @default(false) // quests locked after the missed nightly window → 0.8x XP
+  lastDeltaJson    String? // undo stack — JSON array of applied quest deltas (newest last)
   isLockdown       Boolean   @default(false)
   shieldUsed       Boolean   @default(false)
   overrideUsed     Boolean   @default(false)

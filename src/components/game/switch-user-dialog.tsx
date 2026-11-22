@@ -12,8 +12,8 @@ import { cn } from '@/lib/utils'
 import type { GameState, PId } from '@/lib/types'
 
 const BROTHERS: { id: PId; name: string; cls: string }[] = [
-  { id: 'sobhnath', name: 'Sobhnath', cls: 'border-cyan-400/60 text-cyan-300 hud-glow-cyan' },
-  { id: 'umang', name: 'Umang', cls: 'border-emerald-400/60 text-emerald-300 hud-glow-emerald' },
+  { id: 'sobhnath', name: 'Sobhnath', cls: 'border-sobh/60 bg-sobh/10 text-sobh shadow-[0_0_18px_-6px_var(--glow-cyan)]' },
+  { id: 'umang', name: 'Umang', cls: 'border-umang/60 bg-umang/10 text-umang shadow-[0_0_18px_-6px_var(--glow-emerald)]' },
 ]
 
 /**
@@ -54,10 +54,10 @@ export function SwitchUserDialog({ open, onOpenChange, state }: { open: boolean;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border bg-card sm:max-w-sm">
+      <DialogContent className="ember-ring border-border bg-card sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-sm uppercase tracking-[0.2em]">
-            <ArrowLeftRight className="h-4 w-4 text-amber-300" /> Switch user
+          <DialogTitle className="flex items-center gap-2 font-display text-sm uppercase tracking-[0.2em]">
+            <ArrowLeftRight className="h-4 w-4 text-gold" /> Switch user
           </DialogTitle>
         </DialogHeader>
         <HudPanel className="p-3">
@@ -72,7 +72,7 @@ export function SwitchUserDialog({ open, onOpenChange, state }: { open: boolean;
                   disabled={isMe}
                   onClick={() => setSelected(b.id)}
                   className={cn(
-                    'rounded-lg border bg-black/40 p-3 text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed',
+                    'rounded-lg border bg-foreground/[0.03] p-3 text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed',
                     !isMe && selected === b.id ? b.cls : 'border-border text-muted-foreground',
                     !isMe && selected !== b.id && 'hover:text-foreground',
                   )}
@@ -80,14 +80,14 @@ export function SwitchUserDialog({ open, onOpenChange, state }: { open: boolean;
                   <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                     {isMe ? 'SEATED NOW' : selected === b.id ? 'SWITCH TO →' : 'TAP TO PICK'}
                   </div>
-                  <div className={cn('mt-1 font-black uppercase tracking-wider', !isMe && selected === b.id ? PLAYER_THEME[b.id].text : '')}>{b.name}</div>
+                  <div className={cn('mt-1 font-display text-sm font-extrabold uppercase tracking-wider', !isMe && selected === b.id ? PLAYER_THEME[b.id].text : '')}>{b.name}</div>
                 </motion.button>
               )
             })}
           </div>
 
           {selected && selected !== me && (
-            <div className="mt-3 flex items-start gap-2 rounded border border-amber-400/50 bg-amber-400/10 px-2.5 py-2 text-[11px] leading-snug text-amber-200">
+            <div className="mt-3 flex items-start gap-2 rounded-lg border border-gold/45 bg-gold/10 px-2.5 py-2 text-[11px] leading-snug text-gold">
               <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 Entering <b>{selected === 'sobhnath' ? 'Sobhnath' : 'Umang'}&apos;s</b> PIN signs the current player out of this device. Switching back needs the other PIN again — nobody reads anybody&apos;s account.
@@ -105,7 +105,7 @@ export function SwitchUserDialog({ open, onOpenChange, state }: { open: boolean;
               onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
               onKeyDown={(e) => e.key === 'Enter' && switchUser()}
               placeholder="••••"
-              className="num w-full rounded border border-input bg-black/50 px-3 py-2.5 text-center text-2xl tracking-[0.5em] outline-none focus:border-amber-400/60"
+              className="num w-full rounded-lg border border-input bg-foreground/[0.04] px-3 py-2.5 text-center text-2xl tracking-[0.5em] outline-none transition-colors focus:border-gold/60"
               aria-label="PIN to switch user"
             />
           </div>

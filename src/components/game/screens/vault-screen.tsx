@@ -78,7 +78,7 @@ export function VaultScreen({ state }: { state: GameState }) {
   return (
     <div className="space-y-4">
       {/* A+B. Balance card — turns dark red under lockdown */}
-      <div className={cn('rounded-lg p-6', lockdown ? 'border border-red-500/50 bg-red-950/40 hud-glow-crimson' : 'hud-panel hud-glow-gold')}>
+      <div className={cn('rounded-xl p-6', lockdown ? 'border border-crimson/50 bg-crimson/10 hud-glow-crimson' : 'hud-panel hud-glow-gold')}>
         <SectionTitle
           right={<StatChip tone="gold" label="rate" value={`1 XP = ${me.entMultiplier}m`} />}
         >
@@ -90,33 +90,33 @@ export function VaultScreen({ state }: { state: GameState }) {
             <p className="hud-title">Bank balance</p>
             <div
               className={cn(
-                'num text-5xl font-black leading-tight tracking-tight sm:text-6xl md:text-7xl',
-                negative ? 'text-red-400 text-glow-crimson' : 'text-amber-300 text-glow-gold',
+                'num font-display text-5xl font-black leading-tight tracking-tight sm:text-6xl md:text-7xl',
+                negative ? 'text-crimson text-glow-crimson' : 'xp-gold-text drop-shadow-[0_2px_14px_var(--glow-gold)]',
               )}
             >
               {fmtClock(liveBalance)}
             </div>
           </div>
           {lockdown && (
-            <div className="flex items-center gap-2 rounded-md border border-red-500/50 bg-red-950/60 px-3 py-2 lockdown-flash">
-              <Lock className="h-5 w-5 text-red-300" aria-hidden />
-              <span className="text-sm font-black uppercase tracking-[0.15em] text-red-200">Lockdown active — 00:00 available</span>
+            <div className="flex items-center gap-2 rounded-lg border border-crimson/50 bg-crimson/10 px-3 py-2 lockdown-flash">
+              <Lock className="h-5 w-5 text-crimson" aria-hidden />
+              <span className="text-sm font-black uppercase tracking-[0.15em] text-crimson">Lockdown active — 00:00 available</span>
             </div>
           )}
         </div>
 
         {negative ? (
-          <p className="mt-2 text-xs font-bold uppercase tracking-[0.15em] text-red-300 lockdown-flash">
+          <p className="mt-2 text-xs font-bold uppercase tracking-[0.15em] text-crimson lockdown-flash">
             Overspent — earn XP to recover
           </p>
         ) : (
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Earned today: <span className="num font-semibold text-amber-300">+{earnedToday}m</span> available at 1 XP ={' '}
+            Earned today: <span className="num font-semibold text-gold">+{earnedToday}m</span> available at 1 XP ={' '}
             <span className="num">{me.entMultiplier}m</span>
           </p>
         )}
         {watching && (
-          <p className="num mt-1.5 text-[11px] text-red-300/80">
+          <p className="num mt-1.5 text-[11px] text-crimson/80">
             Draining live — balance {fmtClock(liveBalance)}
           </p>
         )}
@@ -147,14 +147,14 @@ export function VaultScreen({ state }: { state: GameState }) {
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-red-300/80 lockdown-flash">
+                  <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.25em] text-crimson/80 lockdown-flash">
                     <Timer className="h-3.5 w-3.5" aria-hidden />
                     Live drain — vault draining
                   </p>
-                  <p className="num mt-1 text-4xl font-black text-red-300 text-glow-crimson">{fmtElapsed(elapsedSec)}</p>
+                  <p className="num mt-1 font-display text-4xl font-black text-crimson text-glow-crimson">{fmtElapsed(elapsedSec)}</p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Drained <span className="num text-red-300">{drainedMins}m</span> — balance{' '}
-                    <span className="num text-amber-300">{fmtClock(liveBalance)}</span>
+                    Drained <span className="num text-crimson">{drainedMins}m</span> — balance{' '}
+                    <span className="num text-gold">{fmtClock(liveBalance)}</span>
                   </p>
                 </div>
                 <ActionButton
@@ -178,7 +178,7 @@ export function VaultScreen({ state }: { state: GameState }) {
           ) : (
             <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
               {otherPlayer?.watching && (
-                <div className="mb-3 flex items-center gap-2 rounded-md border border-red-500/50 bg-red-500/10 px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.12em] text-red-300 lockdown-flash">
+                <div className="mb-3 flex items-center gap-2 rounded-lg border border-crimson/50 bg-crimson/10 px-3 py-2.5 text-[11px] font-bold uppercase tracking-[0.12em] text-crimson lockdown-flash">
                   <Eye className="h-4 w-4 shrink-0" aria-hidden />
                   <span>{otherPlayer.displayName} is watching — their vault is draining live</span>
                 </div>
@@ -193,7 +193,7 @@ export function VaultScreen({ state }: { state: GameState }) {
                 Start watching / gaming
               </ActionButton>
               {lockdown && (
-                <p className="mt-2 flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-red-300/80">
+                <p className="mt-2 flex items-center justify-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-crimson/80">
                   <Lock className="h-3 w-3" aria-hidden />
                   Stopwatch disabled under lockdown
                 </p>
@@ -228,7 +228,7 @@ export function VaultScreen({ state }: { state: GameState }) {
             placeholder="Custom minutes"
             aria-label="Custom minutes to spend"
             disabled={lockdown || busy}
-            className="num h-9 bg-black/50"
+            className="num h-10 bg-foreground/[0.04]"
           />
           <ActionButton
             tone="gold"
@@ -240,7 +240,7 @@ export function VaultScreen({ state }: { state: GameState }) {
           </ActionButton>
         </div>
         {lockdown ? (
-          <p className="mt-2.5 flex items-center gap-1.5 text-[11px] font-semibold text-red-300 lockdown-flash">
+          <p className="mt-2.5 flex items-center gap-1.5 text-[11px] font-semibold text-crimson lockdown-flash">
             <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
             Spending is hard-locked today — the server enforces it too.
           </p>
@@ -254,12 +254,12 @@ export function VaultScreen({ state }: { state: GameState }) {
       </HudPanel>
 
       {/* E. Rules footer */}
-      <div className="flex items-start gap-2 rounded-md border border-border bg-black/30 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+      <div className="surface-sunken flex items-start gap-2 rounded-lg px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
         <p>
           Spend 20m right after a study block — instant guilt-free dopamine. Bank the rest.{' '}
-          <span className="font-semibold text-cyan-300">Sobhnath 1x</span>,{' '}
-          <span className="font-semibold text-emerald-300">Umang 2x</span>.
+          <span className="font-semibold text-sobh">Sobhnath 1x</span>,{' '}
+          <span className="font-semibold text-umang">Umang 2x</span>.
         </p>
       </div>
     </div>

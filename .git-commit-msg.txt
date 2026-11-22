@@ -1,0 +1,10 @@
+v1.1: late quest rescue (0.8x toll), undo station, brother quest reveal, warm-ember dual-theme UI, serverless perf refactor
+
+- Late lock: missed the 23:30 window? lock TODAY late, whole day pays x0.8 XP (stacks with lockdown = x0.4); netXp recomputed immediately
+- Undo: stack of last 10 quest deltas on DailyLog.lastDeltaJson; negates deltas, restores study mode, claws back vault credit (floored at balance); new /api/quests/undo
+- Brother quests: sealed until locked, then revealed on the Quests screen for both brothers
+- Perf: getFullState runs 8 queries in one Promise.all (was ~10 sequential round trips); runDueJobs throttled to 60s with batch claim reads (was 10 rejected writes per poll); repairLogWeeks hourly; seed check cached; prisma query logging off in prod
+- Schema: DailyLog.lateQuests + DailyLog.lastDeltaJson (both dialects); runtime auto-migration ALTERs Supabase on boot (zero user SQL steps); DDL file updated
+- Client: optimistic quest-delta updates for instant XP feel, server reconciles right after; rollback on error
+- UI: full warm-ember restyle (Claude peach palette) - light+dark themes via next-themes, Bricolage Grotesque display font, gloss XP bars, fighting-game player cards, boss damage flash, ember-ring dialogs, reduced-motion support
+- dev utility: scripts/reset-dev-pins.mjs (local SQLite only)

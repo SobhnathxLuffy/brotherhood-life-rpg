@@ -51,6 +51,8 @@ CREATE TABLE "DailyLog" (
     "workoutMins" INTEGER NOT NULL DEFAULT 0,
     "skillMins" INTEGER NOT NULL DEFAULT 0,
     "xpMultiplier" DOUBLE PRECISION NOT NULL DEFAULT 1.0,
+    "lateQuests" BOOLEAN NOT NULL DEFAULT false,
+    "lastDeltaJson" TEXT,
     "isLockdown" BOOLEAN NOT NULL DEFAULT false,
     "shieldUsed" BOOLEAN NOT NULL DEFAULT false,
     "overrideUsed" BOOLEAN NOT NULL DEFAULT false,
