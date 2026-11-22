@@ -9,7 +9,7 @@ Built on the plan's exact math (kept 100% deterministic in one immutable file), 
 | Vite SPA + Supabase | **Next.js 16 + TypeScript + Tailwind 4 + shadcn/ui + Framer Motion** | All game logic runs server-side in API routes — the UI literally *cannot* cheat. Same free Vercel deploy. |
 | Supabase Realtime | **Socket.io live broadcast + 4s polling fallback** | Instant `-140 BOSS HP` / snitch alerts on both devices, no external service account needed. |
 | pg_cron only | **Opportunistic scheduler + `POST /api/cron` + optional `supabase/cron.sql`** | Jobs run even if nobody hits the endpoint; nobody can game the device clock. |
-| SQLite-local Prisma | **Prisma (SQLite local / Postgres prod via one file swap)** | Deploy to Vercel + Neon/Supabase Postgres with a 2-step change. |
+| SQLite-local Prisma | **Prisma (SQLite local / Postgres prod — schema auto-picked at build time)** | Deploy to Vercel + Neon/Supabase Postgres with zero code or file swaps. |
 
 ## The game (exact rules shipped)
 
@@ -93,23 +93,17 @@ The repo owner is `SobhnathxLuffy`. Keep every secret out of git — only `.env.
 
 3. **Deploy** → you get `https://<your-app>.vercel.app`.
 
-### Step 4 — Create the tables (one-time)
+### Step 4 — Create the tables (one-time, no local tooling needed)
 
-From your machine, against the **DIRECT_URL**:
+1. Supabase dashboard → **SQL Editor** → **New query**.
+2. Paste the entire contents of [`supabase/prisma-postgres-ddl.sql`](supabase/prisma-postgres-ddl.sql) — generated from the exact Prisma schema (7 tables: `Player`, `Week`, `DailyLog`, `Ledger`, `Punishment`, `EntSession`, `AppMeta`).
+3. **Run** → Success. No seeding needed: on first load the app auto-creates both brothers (default PINs **Sobhnath 1111 / Umang 2222 — change both in Settings ⚙ immediately**) and spawns the first week's boss.
 
-```bash
-cp prisma/schema.postgres.prisma prisma/schema.prisma   # swap SQLite → Postgres schema
-DATABASE_URL="<DIRECT_URL>" DIRECT_URL="<DIRECT_URL>" npx prisma db push
-```
+> Do **not** also run `supabase/schema.sql` / `supabase/cron.sql` — those are an alternative pure-Supabase architecture with different column names; mixing them breaks `prisma db push`.
 
-(Commit the swapped schema file — it's the production schema. Locally the SQLite dev schema stays in git history if you ever want it back.)
+### Step 5 — Scheduled jobs (already wired)
 
-### Step 5 — Scheduled jobs (optional but recommended)
-
-The scheduler already runs opportunistically every time either brother opens the app, so rollovers can never be skipped by more than "the first open of the day". For precise 00:01 IST midnight + Sunday 22:00 settlement even when nobody opens the app:
-
-- **cron-job.org (free, works on Vercel Hobby)** — new job → URL `https://<your-app>.vercel.app/api/cron` → every 5 minutes → add header `x-cron-secret: <your CRON_SECRET>`.
-- **Vercel Cron (Pro plan)** — add `"crons": [{ "path": "/api/cron", "schedule": "*/5 * * * *" }]` in `vercel.json`; Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically (the endpoint accepts both header styles).
+The scheduler runs opportunistically every time either brother opens the app (with a 10-day catch-up sweep), so jobs can never be skipped by more than "the first open of the day". `vercel.json` additionally pings `/api/cron` **daily at 00:01 IST** (`31 18 * * *` UTC — exactly the plan's rollover moment; Vercel Hobby allows once-per-day crons and sends `Authorization: Bearer <CRON_SECRET>` automatically). Want tighter timing? Add cron-job.org (free): URL `https://<your-app>.vercel.app/api/cron`, every 5 minutes, header `x-cron-secret: <CRON_SECRET>`.
 
 ### Step 6 — Install on both phones
 
@@ -134,8 +128,9 @@ src/lib/auth.ts              ← PIN (scrypt) + signed session (cookie + bearer 
 src/app/api/*                ← state, auth, quests/lock|log|import, ent, snitch, items, punishments, pvp, cron
 mini-services/game-socket/   ← socket.io broadcaster (port 3003)
 src/components/game/screens/ ← HUD · Quests · Vault · Arena · Chamber
-supabase/                    ← optional pure-Supabase schema + pg_cron jobs
-prisma/schema.postgres.prisma← production DB swap
+supabase/                    ← Postgres DDL to paste into the Supabase SQL Editor (+ optional pure-Supabase path)
+prisma/schema.postgres.prisma← production schema (auto-picked at build when DATABASE_URL is Postgres)
+vercel.json                  ← daily 00:01 IST cron ping to /api/cron
 ```
 
 ## Notes

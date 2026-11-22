@@ -2,12 +2,20 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'crypto'
 import { cookies } from 'next/headers'
 import { PLAYER_IDS } from '@/engine/rules'
 
-if (process.env.NODE_ENV === 'production' && !process.env.AUTH_SECRET) {
-  throw new Error('AUTH_SECRET must be set in production')
-}
-
 const SESSION_COOKIE = 'rpg_session'
-const SECRET = process.env.AUTH_SECRET || 'brotherhood-rpg-local-secret-change-me-in-prod'
+
+/**
+ * Resolved lazily (NOT at module import): `next build` evaluates route modules
+ * during "collecting page data", and production builds on Vercel must succeed
+ * even before env vars are configured. The guard fires at request time instead.
+ */
+function secret(): string {
+  const s = process.env.AUTH_SECRET
+  if (!s && process.env.NODE_ENV === 'production') {
+    throw new Error('Server misconfigured: AUTH_SECRET is not set')
+  }
+  return s || 'brotherhood-rpg-local-secret-change-me-in-prod'
+}
 
 // ---- PIN brute-force limiter (in-memory): max 10 failed attempts per 10 minutes ----
 
@@ -63,7 +71,7 @@ export function verifyPin(pin: string, stored: string): boolean {
 // ---- Signed session cookie: "<playerId>.<issuedAtMs>.<hmac>" ----
 
 function sign(payload: string): string {
-  return createHmac('sha256', SECRET).update(payload).digest('hex')
+  return createHmac('sha256', secret()).update(payload).digest('hex')
 }
 
 export function makeSessionToken(playerId: string): string {
