@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { AlertTriangle, BookOpen, CalendarDays, Dumbbell, Eye, FileJson, Hammer, Lock, Pencil, Undo2, UserRound } from 'lucide-react'
+import { AlertTriangle, BookOpen, CalendarDays, Dumbbell, Eye, FileJson, Hammer, Hourglass, Lock, Pencil, Undo2, UserRound } from 'lucide-react'
 import type { GameState, PId, PlayerState } from '@/lib/types'
 import {
   LATE_QUEST_MULT,
@@ -98,11 +98,12 @@ function deltaLabel(delta: QuestDeltaBody): string {
 }
 
 /** Apply a quest delta to the cached state immediately; the refetch lands the server truth. */
-function optimisticQuestDelta(qc: ReturnType<typeof useQueryClient>, pid: PId, delta: QuestDeltaBody) {
+function optimisticQuestDelta(qc: ReturnType<typeof useQueryClient>, pid: PId, delta: QuestDeltaBody, target: 'today' | 'yesterday' = 'today') {
   qc.setQueryData<GameState>(['game-state'], (old) => {
     if (!old || !old.players[pid]) return old
     const me = old.players[pid]
-    const log = me.todayLog
+    const log = target === 'today' ? me.todayLog : me.yesterdayLog
+    if (!log) return old
     const next = {
       studyMode: ('studyMode' in delta ? delta.studyMode : log.studyMode) as StudyMode,
       studyQuestions: 'studyQuestions' in delta ? Math.max(0, round2(log.studyQuestions + delta.studyQuestions)) : log.studyQuestions,
@@ -117,6 +118,14 @@ function optimisticQuestDelta(qc: ReturnType<typeof useQueryClient>, pid: PId, d
     const effDelta = round2(newQuestXp * mult - round2(log.questXp * mult))
     const credited = effDelta > 0 ? round2(effDelta * me.entMultiplier) : 0
     const totalXp = Math.max(0, round2(me.totalXp + effDelta))
+    const updatedLog: PlayerState['todayLog'] = {
+      ...log,
+      ...next,
+      questXp: newQuestXp,
+      netXp: newNetXp,
+      canUndo: true,
+      undoLabel: deltaLabel(delta),
+    }
     return {
       ...old,
       players: {
@@ -127,18 +136,48 @@ function optimisticQuestDelta(qc: ReturnType<typeof useQueryClient>, pid: PId, d
           weeklyXp: round2(me.weeklyXp + effDelta),
           totalXp,
           level: levelFromTotalXp(totalXp),
-          todayLog: {
-            ...log,
-            ...next,
-            questXp: newQuestXp,
-            netXp: newNetXp,
-            canUndo: true,
-            undoLabel: deltaLabel(delta),
-          },
+          ...(target === 'today' ? { todayLog: updatedLog } : { yesterdayLog: updatedLog }),
         },
       },
     }
   })
+}
+
+// ---------- custom amount input (any number — quick buttons stay for speed) ----------
+
+function CustomDelta({ unit, tone, busy, whole, onApply }: {
+  unit: string
+  tone: 'cyan' | 'emerald' | 'gold'
+  busy: boolean
+  /** minutes columns are Int — enforce whole numbers before hitting the server */
+  whole?: boolean
+  onApply: (n: number) => void
+}) {
+  const [v, setV] = useState('')
+  const trimmed = v.trim()
+  const n = Number(trimmed)
+  const valid = trimmed !== '' && Number.isFinite(n) && n > 0 && (!whole || Number.isInteger(n))
+  const apply = () => {
+    if (!valid || busy) return
+    onApply(n)
+    setV('')
+  }
+  return (
+    <div className="mt-2 flex items-center gap-1.5">
+      <input
+        type="number" inputMode="decimal" min="0" step={whole ? '1' : 'any'}
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') apply() }}
+        placeholder={`custom ${unit}`}
+        aria-label={`Custom amount in ${unit} — type any number`}
+        className="num w-24 rounded-lg border border-input bg-foreground/[0.04] px-2 py-1.5 text-xs outline-none transition-colors placeholder:font-normal placeholder:text-muted-foreground/50 focus:border-primary/60"
+      />
+      <ActionButton tone={tone} size="sm" disabled={!valid || busy} onClick={apply}>
+        Add {unit}
+      </ActionButton>
+    </div>
+  )
 }
 
 // ---------- shared: nightly lock form ----------
@@ -524,7 +563,7 @@ function StudyCard({ me, post, busy, onEdit }: { me: PlayerState; post: (body: Q
         ))}
       </div>
 
-      {/* increment buttons */}
+      {/* increment buttons + custom amount (any number works) */}
       <div className="flex flex-wrap gap-1.5">
         {(isQuestions ? [1, 5, 10] : [0.5, 1]).map((n) => (
           <ActionButton
@@ -543,6 +582,16 @@ function StudyCard({ me, post, busy, onEdit }: { me: PlayerState; post: (body: Q
           </ActionButton>
         ))}
       </div>
+      <CustomDelta
+        unit={isQuestions ? 'Q' : 'h'}
+        tone="cyan"
+        busy={busy}
+        onApply={(n) => {
+          void (isQuestions
+            ? post({ studyQuestions: n }, `+${n} questions logged — grinding.`)
+            : post({ studyHours: n }, `+${n}h study logged — grinding.`))
+        }}
+      />
 
       {/* progress + live XP preview */}
       <div className="mt-3 space-y-1.5">
@@ -609,6 +658,7 @@ function WorkoutCard({ me, post, busy, onEdit }: { me: PlayerState; post: (body:
           +15m
         </ActionButton>
       </div>
+      <CustomDelta unit="m" tone="emerald" busy={busy} whole onApply={(n) => { void post({ workoutMins: n }, `+${n}m workout logged`) }} />
 
       <div className="mt-3 space-y-1.5">
         <GameBar
@@ -677,6 +727,7 @@ function SkillCard({ me, post, busy, onEdit }: { me: PlayerState; post: (body: Q
           </ActionButton>
         ))}
       </div>
+      <CustomDelta unit="m" tone="gold" busy={busy} whole onApply={(n) => { void post({ skillMins: n }, `+${n}m skill practice logged`) }} />
 
       <div className="mt-3 space-y-1.5">
         <GameBar
@@ -764,6 +815,175 @@ function TomorrowQuestsPanel({ state, onEdit }: { state: GameState; onEdit: () =
         <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-foreground/[0.03] px-3 py-3 text-xs font-semibold text-muted-foreground">
           <Lock className="h-4 w-4 shrink-0" aria-hidden />
           Nothing written for tomorrow yet — lock them tonight before 11:30 PM IST (panel above).
+        </div>
+      )}
+    </HudPanel>
+  )
+}
+
+// ---------- late-log panel (tick off yesterday after missing midnight) ----------
+
+/** IST-safe yesterday date string (noon-IST anchor keeps the ISO slice on the right day). */
+function istYesterday(dateStr: string): string {
+  const d = new Date(`${dateStr}T12:00:00+05:30`)
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
+function YesterdayLogPanel({ me, post, busy, onUndo, undoBusy }: {
+  me: PlayerState
+  post: (body: QuestDeltaBody, okMsg: string, target: 'today' | 'yesterday') => Promise<void>
+  busy: boolean
+  onUndo: () => void
+  undoBusy: boolean
+}) {
+  const log = me.yesterdayLog
+  const date = istYesterday(me.todayLog.logDate)
+  const yMode = (log?.studyMode ?? 'questions') as StudyMode
+  const isQuestions = yMode === 'questions'
+  const yStudy = isQuestions ? log?.studyQuestions ?? 0 : log?.studyHours ?? 0
+  const yWorkout = log?.workoutMins ?? 0
+  const ySkill = log?.skillMins ?? 0
+
+  return (
+    <HudPanel glow="gold">
+      <SectionTitle
+        right={
+          log ? (
+            <StatChip tone="gold" label={date} value={`${round2(log.netXp)} XP`} />
+          ) : (
+            <StatChip label={date} value="empty" />
+          )
+        }
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <Hourglass className="h-4 w-4" aria-hidden />
+          Forgot to log yesterday?
+        </span>
+      </SectionTitle>
+      <p className="mb-3 text-[11px] leading-relaxed text-muted-foreground">
+        Did the work but missed the midnight window? Tick it off now — everything lands on{' '}
+        <span className="num font-semibold text-foreground">{date}</span>&apos;s tally (weekly XP, co-op boss, vault), and
+        last night&apos;s rollover — weekly HP, streak, punishment ticket — is automatically re-judged with the real numbers.
+        The <span className="font-semibold text-foreground">custom box</span> takes any number.
+      </p>
+      {log?.questsLocked && (
+        <p className="mb-3 border-l-2 border-primary/40 pl-2.5 text-xs italic leading-relaxed text-muted-foreground">
+          &ldquo;{log.studyQuestText ?? '—'} · {log.workoutQuestText ?? '—'} · {log.skillQuestText ?? '—'}&rdquo;
+        </p>
+      )}
+
+      <div className="space-y-2.5">
+        {/* study */}
+        <div className="rounded-lg border border-border/70 bg-foreground/[0.03] px-3 py-2.5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              <BookOpen className="h-3.5 w-3.5" aria-hidden /> Study
+              <span className="flex gap-1">
+                {(['questions', 'hours'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    aria-label={`Track yesterday's study in ${m}`}
+                    disabled={busy || (log?.studyMode ?? 'questions') === m}
+                    onClick={() => { void post({ studyMode: m }, `Yesterday tracked in ${m.toUpperCase()} now`, 'yesterday') }}
+                    className={cn(
+                      'rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider transition-colors',
+                      (log?.studyMode ?? 'questions') === m
+                        ? 'border-primary/60 bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                    )}
+                  >
+                    {m === 'questions' ? 'Q' : 'H'}
+                  </button>
+                ))}
+              </span>
+            </span>
+            <span className="num text-xs font-bold text-primary">
+              {round2(yStudy)}{isQuestions ? 'Q' : 'h'} · {round2(calcStudyXP(yMode, yStudy))} XP
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {(isQuestions ? [1, 5, 10] : [0.5, 1]).map((n) => (
+              <ActionButton
+                key={n}
+                tone="cyan"
+                size="sm"
+                className="num"
+                disabled={busy}
+                onClick={() => {
+                  void (isQuestions
+                    ? post({ studyQuestions: n }, `Late log: +${n} questions for ${date}`, 'yesterday')
+                    : post({ studyHours: n }, `Late log: +${n}h study for ${date}`, 'yesterday'))
+                }}
+              >
+                {isQuestions ? `+${n} Q` : `+${n}h`}
+              </ActionButton>
+            ))}
+          </div>
+          <CustomDelta
+            unit={isQuestions ? 'Q' : 'h'}
+            tone="cyan"
+            busy={busy}
+            onApply={(n) => {
+              void (isQuestions
+                ? post({ studyQuestions: n }, `Late log: +${n} questions for ${date}`, 'yesterday')
+                : post({ studyHours: n }, `Late log: +${n}h study for ${date}`, 'yesterday'))
+            }}
+          />
+        </div>
+
+        {/* workout */}
+        <div className="rounded-lg border border-border/70 bg-foreground/[0.03] px-3 py-2.5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              <Dumbbell className="h-3.5 w-3.5" aria-hidden /> Workout
+            </span>
+            <span className="num text-xs font-bold text-umang">
+              {round2(yWorkout)}m · {round2(calcWorkoutXP(yWorkout))} XP
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {[30, 5, 15].map((n) => (
+              <ActionButton key={n} tone="emerald" size="sm" className="num" disabled={busy}
+                onClick={() => { void post({ workoutMins: n }, `Late log: +${n}m workout for ${date}`, 'yesterday') }}>
+                +{n}m
+              </ActionButton>
+            ))}
+          </div>
+          <CustomDelta unit="m" tone="emerald" busy={busy} whole onApply={(n) => { void post({ workoutMins: n }, `Late log: +${n}m workout for ${date}`, 'yesterday') }} />
+        </div>
+
+        {/* skill */}
+        <div className="rounded-lg border border-border/70 bg-foreground/[0.03] px-3 py-2.5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+              <Hammer className="h-3.5 w-3.5" aria-hidden /> Skill
+            </span>
+            <span className="num text-xs font-bold text-gold">
+              {round2(ySkill)}m · {round2(calcSkillXP(ySkill))} XP
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {[15, 30, 45].map((n) => (
+              <ActionButton key={n} tone="gold" size="sm" className="num" disabled={busy}
+                onClick={() => { void post({ skillMins: n }, `Late log: +${n}m skill for ${date}`, 'yesterday') }}>
+                +{n}m
+              </ActionButton>
+            ))}
+          </div>
+          <CustomDelta unit="m" tone="gold" busy={busy} whole onApply={(n) => { void post({ skillMins: n }, `Late log: +${n}m skill for ${date}`, 'yesterday') }} />
+        </div>
+      </div>
+
+      {log?.canUndo && (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-crimson/40 bg-crimson/10 px-3 py-2">
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Last late-log: <span className="font-semibold text-foreground">{log.undoLabel}</span> — undo re-judges last night&apos;s rollover too.
+          </p>
+          <ActionButton tone="crimson" size="sm" disabled={undoBusy} onClick={onUndo} className="shrink-0">
+            <Undo2 className="mr-1 inline h-3.5 w-3.5" aria-hidden /> Undo
+          </ActionButton>
         </div>
       )}
     </HudPanel>
@@ -912,14 +1132,14 @@ export function QuestsScreen({ state }: { state: GameState }) {
   }, [state.ist.minutes, state.deadlines.questLockPassed, promptKey, tomorrowLocked])
 
   const post = useCallback(
-    async (body: QuestDeltaBody, okMsg: string) => {
+    async (body: QuestDeltaBody, okMsg: string, target: 'today' | 'yesterday' = 'today') => {
       if (!state.me) return
       setBusy(true)
-      optimisticQuestDelta(qc, state.me, body) // instant feedback — server truth lands via refetch
+      optimisticQuestDelta(qc, state.me, body, target) // instant feedback — server truth lands via refetch
       try {
-        await apiPost('/api/quests/log', body)
+        const res = await apiPost<{ rolloverRepaired?: boolean }>('/api/quests/log', { ...body, target })
         await qc.invalidateQueries({ queryKey: ['game-state'] })
-        toast.success(okMsg)
+        toast.success(target === 'yesterday' && res.rolloverRepaired ? `${okMsg} — last night's rollover re-judged.` : okMsg)
       } catch (err) {
         await qc.invalidateQueries({ queryKey: ['game-state'] }) // roll back to server truth
         toast.error(err instanceof Error ? err.message : 'Quest log failed')
@@ -937,6 +1157,23 @@ export function QuestsScreen({ state }: { state: GameState }) {
         const res = await apiPost<{ undone: string }>('/api/quests/undo')
         await qc.invalidateQueries({ queryKey: ['game-state'] })
         toast.success(`Reversed: ${res.undone}`)
+      } catch (err) {
+        await qc.invalidateQueries({ queryKey: ['game-state'] })
+        toast.error(err instanceof Error ? err.message : 'Undo failed')
+      } finally {
+        setBusy(false)
+      }
+    },
+    [qc],
+  )
+
+  const undoYesterday = useCallback(
+    async () => {
+      setBusy(true)
+      try {
+        const res = await apiPost<{ undone: string; rolloverRepaired?: boolean }>('/api/quests/undo', { target: 'yesterday' })
+        await qc.invalidateQueries({ queryKey: ['game-state'] })
+        toast.success(`Reversed yesterday's late log: ${res.undone}${res.rolloverRepaired ? ' — rollover re-judged' : ''}`)
       } catch (err) {
         await qc.invalidateQueries({ queryKey: ['game-state'] })
         toast.error(err instanceof Error ? err.message : 'Undo failed')
@@ -994,6 +1231,11 @@ export function QuestsScreen({ state }: { state: GameState }) {
         <StudyCard me={me} post={post} busy={busy} onEdit={needsLateRescue ? undefined : openTodayEdit} />
         <WorkoutCard me={me} post={post} busy={busy} onEdit={needsLateRescue ? undefined : openTodayEdit} />
         <SkillCard me={me} post={post} busy={busy} onEdit={needsLateRescue ? undefined : openTodayEdit} />
+      </motion.div>
+
+      {/* late-log backfill — tick off yesterday after missing the midnight window */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22, duration: 0.28, ease: 'easeOut' }}>
+        <YesterdayLogPanel me={me} post={post} busy={busy} onUndo={() => { void undoYesterday() }} undoBusy={busy} />
       </motion.div>
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.28, ease: 'easeOut' }}>

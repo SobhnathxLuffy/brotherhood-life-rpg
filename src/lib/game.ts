@@ -529,6 +529,209 @@ class GameError extends Error {}
 
 export { GameError }
 
+/**
+ * What a rollover found + did for one player on one date. The BEFORE fields let
+ * a late-log backfill replay the rollover fairly (see repairRolloverForBackfill);
+ * the DID fields tell the replay which side-effects this rollover owned, so it
+ * never undoes a KO/forfeit that an earlier day's rollover had set.
+ */
+interface RolloverMarker {
+  hpBefore: number
+  streakBefore: number
+  ticketExisted: boolean
+  hpLost: number
+  koSet: boolean
+  streakReset: boolean
+  ticketCreated: boolean
+  shieldGranted: boolean
+}
+
+function rolloverMarkerKey(dateStr: string): string {
+  return `rofx:${dateStr}`
+}
+
+async function writeRolloverMarker(dateStr: string, marker: Record<string, RolloverMarker>) {
+  const value = JSON.stringify(marker)
+  await db.appMeta.upsert({
+    where: { key: rolloverMarkerKey(dateStr) },
+    update: { value },
+    create: { key: rolloverMarkerKey(dateStr), value },
+  })
+}
+
+async function readRolloverMarker(dateStr: string): Promise<Record<string, RolloverMarker> | null> {
+  const row = await db.appMeta.findUnique({ where: { key: rolloverMarkerKey(dateStr) } })
+  if (!row) return null
+  try {
+    const v: unknown = JSON.parse(row.value)
+    return v && typeof v === 'object' ? (v as Record<string, RolloverMarker>) : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Midnight-rollover effects for ONE player on `dateStr` (HP penalty, streak /
+ * shield, punishment ticket). Split out of rollover() so the late-log backfill
+ * repair can replay exactly the same rules against corrected numbers.
+ */
+export async function rolloverPlayerEffects(dateStr: string, pid: PId, week: Week, now: Date = new Date()) {
+  const log = await db.dailyLog.findUnique({ where: { playerId_logDate: { playerId: pid, logDate: dateStr } } })
+  const player = await db.player.findUniqueOrThrow({ where: { id: pid } })
+  const net = log?.netXp ?? 0
+  const protectedDay = !!log && (log.shieldUsed || log.overrideUsed)
+  const isS = pid === 'sobhnath'
+  let hpLost = 0
+  let koSet = false
+  let streakReset = false
+  let ticketCreated = false
+  let shieldGranted = false
+
+  if (!protectedDay) {
+    // HP penalty
+    if (net < R.WEEKLY.LOW_XP_THRESHOLD) {
+      const newHp = Math.max(0, (isS ? week.sobhnathHp : week.umangHp) - R.WEEKLY.LOW_XP_PENALTY)
+      const ko = newHp <= 0
+      hpLost = (isS ? week.sobhnathHp : week.umangHp) - newHp
+      koSet = ko
+      // Only the player who actually KO'd writes pvpForfeitedBy — never write
+      // it from the stale `week` snapshot, or a KO by the other player earlier
+      // in this same loop would be silently overwritten back to null.
+      const update = isS
+        ? { sobhnathHp: newHp, sobhnathKo: ko, ...(ko ? { pvpForfeitedBy: pid } : {}) }
+        : { umangHp: newHp, umangKo: ko, ...(ko ? { pvpForfeitedBy: pid } : {}) }
+      await db.week.update({ where: { id: week.id }, data: update })
+      if (ko) await emit({ kind: 'PVP', playerId: pid, message: `${player.displayName} HIT 0 HP — KNOCKED OUT! Weekly PvP forfeited.` })
+      else await emit({ kind: 'HP', playerId: pid, message: `${player.displayName} scored ${net} XP (<50) — -${R.WEEKLY.LOW_XP_PENALTY} weekly HP (${newHp} left)` })
+    }
+    // streak / shield
+    if (net > R.SHIELDS.STREAK_TARGET_XP) {
+      const streak = player.current70Streak + 1
+      const shieldGain = streak % R.SHIELDS.EVERY_N_DAYS === 0 ? 1 : 0
+      await db.player.update({ where: { id: pid }, data: { current70Streak: streak, shieldsCount: { increment: shieldGain } } })
+      shieldGranted = shieldGain > 0
+      if (shieldGain) await emit({ kind: 'XP', playerId: pid, message: `${player.displayName} earned a REST SHIELD (${streak}-day 70+ XP streak)!` })
+    } else {
+      await db.player.update({ where: { id: pid }, data: { current70Streak: 0 } })
+      streakReset = player.current70Streak > 0
+    }
+    // Sobhnath's punishment ticket
+    if (player.hasPhysicalPunishment && net < 100) {
+      const Rx = R.punishmentRemainingXp(net)
+      const reps = R.calcPunishmentReps(Rx)
+      const exists = await db.punishment.findUnique({ where: { logDate: dateStr } })
+      if (!exists) {
+        await db.punishment.create({ data: { logDate: dateStr, remainingXp: Rx, ...reps } })
+        ticketCreated = true
+        await emit({ kind: 'PUNISH', playerId: pid, message: `Punishment locked for ${dateStr}: ${reps.pushups} pushups, ${reps.pullups} pullups, ${reps.crunches} crunches, ${reps.squats} squats` })
+      }
+    }
+  }
+  return { hpLost, koSet, streakReset, ticketCreated, shieldGranted }
+}
+
+/**
+ * Replay last night's rollover for `pid` after a late-log backfill (or a
+ * yesterday-undo) changed that day's net XP. Restores the pre-rollover state
+ * this rollover was responsible for (weekly HP, KO/forfeit, streak, punishment
+ * ticket) and re-derives it exactly as rollover would have with the corrected
+ * numbers — so forgetting to log never leaves a phantom HP loss or a
+ * punishment ticket for work that was actually done (and undoing a backfill
+ * puts the consequences right back). Idempotent; markerless dates are a no-op.
+ */
+export async function repairRolloverForBackfill(pid: PId, dateStr: string, now: Date = new Date()): Promise<boolean> {
+  const [marker, claim, week] = await Promise.all([
+    readRolloverMarker(dateStr),
+    db.appMeta.findUnique({ where: { key: `rollover:${dateStr}` } }),
+    weekOf(dateStr),
+  ])
+  const b = marker?.[pid]
+  if (!b || !claim || !week) {
+    await checkBossDamage(dateStr, now) // rollover never ran here — boss may still trigger on fresh XP
+    return false
+  }
+  const log = await getOrCreateLog(pid, dateStr, now)
+  const player = await db.player.findUniqueOrThrow({ where: { id: pid } })
+  const net = log.netXp
+  const protectedDay = log.shieldUsed || log.overrideUsed
+  const isS = pid === 'sobhnath'
+  const summary: string[] = []
+
+  if (!protectedDay) {
+    // ---- weekly HP / KO / forfeit: re-derive from pre-rollover HP + corrected net ----
+    if (net < R.WEEKLY.LOW_XP_THRESHOLD) {
+      const targetHp = Math.max(0, b.hpBefore - R.WEEKLY.LOW_XP_PENALTY)
+      const ko = targetHp <= 0
+      const hpNow = isS ? week.sobhnathHp : week.umangHp
+      const koNow = isS ? week.sobhnathKo : week.umangKo
+      if (hpNow !== targetHp || koNow !== ko) {
+        const update: Record<string, unknown> = isS
+          ? { sobhnathHp: targetHp, sobhnathKo: ko }
+          : { umangHp: targetHp, umangKo: ko }
+        if (ko && !week.pvpWinner && b.koSet) update.pvpForfeitedBy = pid
+        await db.week.update({ where: { id: week.id }, data: update })
+        if (targetHp > hpNow) summary.push(`weekly HP restored ${hpNow} → ${targetHp}`)
+        else if (targetHp < hpNow) summary.push(`weekly HP re-penalized ${hpNow} → ${targetHp}`)
+      }
+    } else if (b.hpLost > 0) {
+      const hpNow = isS ? week.sobhnathHp : week.umangHp
+      const koNow = isS ? week.sobhnathKo : week.umangKo
+      const update: Record<string, unknown> = isS
+        ? { sobhnathHp: b.hpBefore, sobhnathKo: false }
+        : { umangHp: b.hpBefore, umangKo: false }
+      if (!week.pvpWinner && week.pvpForfeitedBy === pid && b.koSet) update.pvpForfeitedBy = null
+      if (hpNow !== b.hpBefore || koNow) {
+        await db.week.update({ where: { id: week.id }, data: update })
+        summary.push(`weekly HP restored ${hpNow} → ${b.hpBefore}${koNow ? ' + KO cleared' : ''}`)
+      }
+    }
+
+    // ---- streak: replay the increment/reset with the corrected XP ----
+    if (net > R.SHIELDS.STREAK_TARGET_XP) {
+      const expected = b.streakBefore + 1
+      if (player.current70Streak !== expected) {
+        const shieldGain = expected % R.SHIELDS.EVERY_N_DAYS === 0 && !b.shieldGranted ? 1 : 0
+        await db.player.update({ where: { id: pid }, data: { current70Streak: expected, shieldsCount: { increment: shieldGain } } })
+        summary.push(shieldGain ? `streak restored to ${expected} (+1 rest shield earned)` : `streak restored to ${expected}`)
+      }
+    } else if (player.current70Streak !== 0) {
+      // corrected net sits at/below the streak bar — the reset (or a lost
+      // increment) stands. Only touches rows this rollover actually reset or
+      // incremented, because nothing else mutates streak between rollovers.
+      if (b.streakReset || b.streakBefore + 1 === player.current70Streak) {
+        await db.player.update({ where: { id: pid }, data: { current70Streak: 0 } })
+        summary.push('streak reset (corrected XP below 70)')
+      }
+    }
+
+    // ---- punishment ticket: re-derive from the corrected net ----
+    if (player.hasPhysicalPunishment && !b.ticketExisted) {
+      const t = await db.punishment.findUnique({ where: { logDate: dateStr } })
+      if (net < 100) {
+        const Rx = R.punishmentRemainingXp(net)
+        const reps = R.calcPunishmentReps(Rx)
+        if (!t) {
+          await db.punishment.create({ data: { logDate: dateStr, remainingXp: Rx, ...reps } })
+          summary.push(`punishment ticket re-locked (${reps.pushups} pushups / ${reps.pullups} pullups…)`)
+        } else if (t.status === 'PENDING' && Math.abs(t.remainingXp - Rx) > 0.001) {
+          // the ticket exists but was sized for the old net — recalibrate it
+          await db.punishment.update({ where: { id: t.id }, data: { remainingXp: Rx, ...reps } })
+          summary.push(`punishment ticket recalibrated to ${Rx} XP short`)
+        }
+      } else if (t && t.status === 'PENDING') {
+        await db.punishment.delete({ where: { id: t.id } })
+        summary.push(`punishment ticket cleared — ${dateStr} actually hit ${net} XP`)
+      }
+    }
+  }
+
+  await checkBossDamage(dateStr, now)
+  if (summary.length) {
+    await emit({ kind: 'HP', playerId: pid, message: `Late-log repair (${dateStr}): ${summary.join(' · ')}` })
+  }
+  return summary.length > 0
+}
+
 /** Midnight rollover for `dateStr` (should be yesterday): HP penalty, streak/shields, punishment ticket. */
 export async function rollover(dateStr: string, now: Date = new Date()) {
   const metaKey = `rollover:${dateStr}`
@@ -549,49 +752,25 @@ export async function rollover(dateStr: string, now: Date = new Date()) {
       await db.appMeta.update({ where: { key: metaKey }, data: { value: 'done' } })
       return false
     }
+    // BEFORE-state marker — the late-log repair replays this rollover from it.
+    const [markerPlayers, markerTickets] = await Promise.all([
+      db.player.findMany({ select: { id: true, current70Streak: true } }),
+      db.punishment.findMany({ where: { logDate: dateStr }, select: { id: true } }),
+    ])
+    const marker: Record<string, RolloverMarker> = {}
     for (const pid of R.PLAYER_IDS) {
-      const log = await db.dailyLog.findUnique({ where: { playerId_logDate: { playerId: pid, logDate: dateStr } } })
-      const player = await db.player.findUniqueOrThrow({ where: { id: pid } })
-      const net = log?.netXp ?? 0
-      const protectedDay = !!log && (log.shieldUsed || log.overrideUsed)
-
-      if (!protectedDay) {
-        // HP penalty
-        if (net < R.WEEKLY.LOW_XP_THRESHOLD) {
-          const isS = pid === 'sobhnath'
-          const newHp = Math.max(0, (isS ? week.sobhnathHp : week.umangHp) - R.WEEKLY.LOW_XP_PENALTY)
-          const ko = newHp <= 0
-          // Only the player who actually KO'd writes pvpForfeitedBy — never write
-          // it from the stale `week` snapshot, or a KO by the other player earlier
-          // in this same loop would be silently overwritten back to null.
-          const update = isS
-            ? { sobhnathHp: newHp, sobhnathKo: ko, ...(ko ? { pvpForfeitedBy: pid } : {}) }
-            : { umangHp: newHp, umangKo: ko, ...(ko ? { pvpForfeitedBy: pid } : {}) }
-          await db.week.update({ where: { id: week.id }, data: update })
-          if (ko) await emit({ kind: 'PVP', playerId: pid, message: `${player.displayName} HIT 0 HP — KNOCKED OUT! Weekly PvP forfeited.` })
-          else await emit({ kind: 'HP', playerId: pid, message: `${player.displayName} scored ${net} XP (<50) — -${R.WEEKLY.LOW_XP_PENALTY} weekly HP (${newHp} left)` })
-        }
-        // streak / shield
-        if (net > R.SHIELDS.STREAK_TARGET_XP) {
-          const streak = player.current70Streak + 1
-          const shieldGain = streak % R.SHIELDS.EVERY_N_DAYS === 0 ? 1 : 0
-          await db.player.update({ where: { id: pid }, data: { current70Streak: streak, shieldsCount: { increment: shieldGain } } })
-          if (shieldGain) await emit({ kind: 'XP', playerId: pid, message: `${player.displayName} earned a REST SHIELD (${streak}-day 70+ XP streak)!` })
-        } else {
-          await db.player.update({ where: { id: pid }, data: { current70Streak: 0 } })
-        }
-        // Sobhnath's punishment ticket
-        if (player.hasPhysicalPunishment && net < 100) {
-          const Rx = R.punishmentRemainingXp(net)
-          const reps = R.calcPunishmentReps(Rx)
-          const exists = await db.punishment.findUnique({ where: { logDate: dateStr } })
-          if (!exists) {
-            await db.punishment.create({ data: { logDate: dateStr, remainingXp: Rx, ...reps } })
-            await emit({ kind: 'PUNISH', playerId: pid, message: `Punishment locked for ${dateStr}: ${reps.pushups} pushups, ${reps.pullups} pullups, ${reps.crunches} crunches, ${reps.squats} squats` })
-          }
-        }
+      marker[pid] = {
+        hpBefore: pid === 'sobhnath' ? week.sobhnathHp : week.umangHp,
+        streakBefore: markerPlayers.find((p) => p.id === pid)?.current70Streak ?? 0,
+        ticketExisted: markerTickets.length > 0,
+        hpLost: 0, koSet: false, streakReset: false, ticketCreated: false, shieldGranted: false,
       }
     }
+    await writeRolloverMarker(dateStr, marker)
+    for (const pid of R.PLAYER_IDS) {
+      Object.assign(marker[pid], await rolloverPlayerEffects(dateStr, pid, week, now))
+    }
+    await writeRolloverMarker(dateStr, marker)
     // auto-close any watch sessions left running before this rollover
     const openSessions = await db.entSession.findMany({ where: { endedAt: null, startedAt: { lt: istToUtc(dateStr, 1440) } } })
     for (const s of openSessions) {
@@ -690,10 +869,11 @@ export async function getFullState(now: Date = new Date(), req?: Request): Promi
   const me = await currentPlayerId(req)
   // One round trip instead of eight sequential ones — this block used to chain
   // ~10 awaits, which on serverless × Supabase latency was the visible lag.
-  const [players, logsToday, logsTomorrow, earnedTodayRows, weeklySums, totalSums, openSessions, feed, punishments] = await Promise.all([
+  const [players, logsToday, logsTomorrow, logsYesterday, earnedTodayRows, weeklySums, totalSums, openSessions, feed, punishments] = await Promise.all([
     db.player.findMany(),
     db.dailyLog.findMany({ where: { logDate: today } }),
     db.dailyLog.findMany({ where: { logDate: istDateOffset(1, now) } }),
+    db.dailyLog.findMany({ where: { logDate: istDateOffset(-1, now) } }),
     db.ledger.findMany({ where: { logDate: today, deltaXp: { gt: 0 } } }),
     db.dailyLog.groupBy({ by: ['playerId'], _sum: { netXp: true }, where: { weekId: week.id } }),
     db.dailyLog.groupBy({ by: ['playerId'], _sum: { netXp: true }, where: { playerId: { in: R.PLAYER_IDS } } }),
@@ -751,6 +931,10 @@ export async function getFullState(now: Date = new Date(), req?: Request): Promi
           tomorrowLog: (() => {
             const tl = logsTomorrow.find((l) => l.playerId === pid)
             return tl ? toLogView(tl) : null
+          })(),
+          yesterdayLog: (() => {
+            const yl = logsYesterday.find((l) => l.playerId === pid)
+            return yl ? toLogView(yl) : null
           })(),
         },
       ]

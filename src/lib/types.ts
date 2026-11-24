@@ -42,6 +42,8 @@ export interface PlayerState {
   todayLog: DailyLogView
   /** tomorrow's log (quest plan written during the nightly lock) — null until it exists */
   tomorrowLog: DailyLogView | null
+  /** yesterday's log — the late-log backfill target when progress was logged after midnight */
+  yesterdayLog: DailyLogView | null
   weeklyXp: number
   totalXp: number
   level: { level: number; title: string; progress: number }
